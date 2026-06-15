@@ -1,0 +1,28 @@
+type: object
+required:
+  - project_name
+properties:
+  project_name:
+    type: string
+  random_seed:
+    type: integer
+    default: 13
+  window_sizes:
+    type: array
+    items: { type: integer, minimum: 1 }
+    default: [200, 1000, 5000, 10000, 50000]
+  step_fraction:
+    type: number
+    minimum: 0.01
+    maximum: 1.0
+    default: 0.5
+  exclude_coding_exons:
+    type: boolean
+    default: true
+  promoter_bp:
+    type: integer
+    default: 1000
+  artifact_thresholds:
+    type: object
+  primitive_thresholds:
+    type: object

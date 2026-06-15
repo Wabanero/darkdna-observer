@@ -1,0 +1,6 @@
+toy_chr1	0	70000	1.0
+toy_chr1	70000	76000	0.25
+toy_chr1	76000	100000	1.0
+toy_chr2	0	80000	1.0
+toy_scaffoldA	0	2000	0.35
+toy_scaffoldA	2000	50000	1.0

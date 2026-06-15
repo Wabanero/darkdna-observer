@@ -1,0 +1,14 @@
+##gff-version 3
+toy_chr1	toy	gene	1001	7000	.	+	.	ID=geneA;Name=ToyGeneA;biotype=protein_coding
+toy_chr1	toy	mRNA	1001	7000	.	+	.	ID=txA;Parent=geneA
+toy_chr1	toy	five_prime_UTR	1001	1200	.	+	.	ID=utrA1;Parent=txA
+toy_chr1	toy	exon	1201	1600	.	+	.	ID=exonA1;Parent=txA
+toy_chr1	toy	exon	3000	3500	.	+	.	ID=exonA2;Parent=txA
+toy_chr1	toy	three_prime_UTR	6800	7000	.	+	.	ID=utrA2;Parent=txA
+toy_chr1	toy	gene	31500	35000	.	-	.	ID=geneB;Name=ToyGeneB;biotype=lncRNA
+toy_chr1	toy	exon	33000	33400	.	-	.	ID=exonB1;Parent=geneB
+toy_chr2	toy	gene	7800	12000	.	+	.	ID=geneC;Name=ToyGeneC;biotype=protein_coding
+toy_chr2	toy	exon	7800	8100	.	+	.	ID=exonC1;Parent=geneC
+toy_chr2	toy	exon	11200	11600	.	+	.	ID=exonC2;Parent=geneC
+toy_scaffoldA	toy	gene	17000	22000	.	-	.	ID=geneD;Name=ToyGeneD;biotype=protein_coding
+toy_scaffoldA	toy	exon	20500	21000	.	-	.	ID=exonD1;Parent=geneD

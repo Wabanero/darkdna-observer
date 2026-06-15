@@ -12,6 +12,7 @@ build/
 dist/
 .venv/
 venv/
+.tools/
 
 results/
 darkdna_run/

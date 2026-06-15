@@ -1,0 +1,11 @@
+project_name: darkdna-observer-yeast-R64-chrI-test
+fasta: data/reference/yeast_R64_chrI/genome.fa
+chrom_sizes: data/reference/yeast_R64_chrI/chrom.sizes
+annotation: data/reference/yeast_R64_chrI/genes.gff3
+output_dir: results/test_yeast_R64_chrI
+window_sizes: [200, 1000, 5000]
+step_fraction: 0.5
+exclude_coding_exons: true
+n_null: 10
+enable_candidate_only_prompt1: true
+enable_gff3_parsing: true

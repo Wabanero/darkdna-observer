@@ -1,0 +1,15 @@
+{
+  "dataset": "arabidopsis_TAIR10_chr1_2Mb",
+  "required_outputs": [
+    "dark_windows.bed",
+    "dark_windows.parquet",
+    "sequence_features.parquet",
+    "primitive_scores.parquet",
+    "null_model_summary.parquet",
+    "residual_scores.parquet",
+    "candidate_primitives.parquet",
+    "region_cards.json",
+    "darkdna_report.html"
+  ],
+  "candidate_only": true
+}

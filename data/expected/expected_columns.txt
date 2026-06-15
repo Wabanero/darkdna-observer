@@ -1,0 +1,13 @@
+region_id
+chrom
+start
+end
+window_size
+artifact_risk_flags
+primitive_class
+primitive_confidence
+matched_null_zscore
+candidate_only
+forbidden_interpretation
+required_validation_data
+suggested_prompt2_view

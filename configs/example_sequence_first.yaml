@@ -1,0 +1,16 @@
+project_name: darkdna-observer-example
+random_seed: 13
+window_sizes: [200, 1000, 5000, 10000, 50000]
+step_fraction: 0.5
+exclude_coding_exons: true
+promoter_bp: 1000
+artifact_thresholds:
+  high_n_fraction: 0.2
+  low_mappability: 0.5
+  extreme_low_complexity: 0.55
+  extreme_repeat_density: 0.65
+  scaffold_edge_bp: 1000
+primitive_thresholds:
+  residual_zscore: 2.0
+  matched_null_zscore: 2.0
+  confidence_high: 0.75

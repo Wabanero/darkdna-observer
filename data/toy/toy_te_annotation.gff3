@@ -1,0 +1,4 @@
+##gff-version 3
+toy_chr2	toy	LTR_retrotransposon	40001	41000	.	+	.	ID=te1;Name=GypsyToy;Class=LTR;Family=GypsyToy;Superfamily=Gypsy;Strand=+;Divergence=0.12
+toy_chr2	toy	DNA_transposon	40600	41600	.	-	.	ID=te2;Name=hATToy;Class=DNA;Family=hATToy;Superfamily=hAT;Strand=-;Divergence=0.05
+toy_chr2	toy	LINE_element	41500	42400	.	+	.	ID=te3;Name=LINEToy;Class=LINE;Family=LINEToy;Superfamily=L1;Strand=+;Divergence=0.21

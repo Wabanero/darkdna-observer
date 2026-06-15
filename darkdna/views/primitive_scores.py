@@ -1,0 +1,142 @@
+"""Primitive-specific score composition."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from darkdna.utils.stats import empirical_p_value, robust_scale_series
+from .boundary_conditions import compute_boundary_condition_view
+from .entropy_noise import compute_entropy_noise_view
+from .physical_susceptibility import compute_physical_susceptibility_view
+from .scale_fractal import compute_scale_fractal_features
+
+
+PRIMITIVE_SCORE_COLUMNS = [
+    "fractal_scaffold_candidate_score",
+    "constraint_grammar_region_candidate_score",
+    "quantum_susceptible_domain_candidate_score",
+    "replication_instability_candidate_score",
+    "decoherence_boundary_candidate_score",
+    "resonant_pulse_decoder_candidate_score",
+    "hysteresis_candidate_score",
+    "possibility_gate_candidate_score",
+    "criticality_tuner_candidate_score",
+    "chromatin_motion_oscillator_candidate_score",
+    "negative_space_element_candidate_score",
+    "sequence_regime_boundary_candidate_score",
+    "TE_grammar_node_candidate_score",
+    "unexplained_dark_anomaly_candidate_score",
+]
+
+
+def value(row: dict, key: str, default: float = 0.0) -> float:
+    try:
+        v = row.get(key, default)
+        if v is None or pd.isna(v):
+            return default
+        return float(v)
+    except Exception:
+        return default
+
+
+def primitive_scores_for_row(row: dict) -> dict[str, float]:
+    enriched = dict(row)
+    if "fractal_score" not in enriched and "sequence" in enriched:
+        enriched.update(compute_scale_fractal_features(str(enriched["sequence"])))
+    enriched.update(compute_physical_susceptibility_view(enriched))
+    enriched.update(compute_entropy_noise_view(enriched))
+    enriched.update(compute_boundary_condition_view(enriched))
+
+    fractal = np.mean([value(enriched, "fractal_score"), value(enriched, "scale_persistence_score"), value(enriched, "compression_anomaly_score")])
+    grammar = np.mean(
+        [
+            value(enriched, "grammar_entropy"),
+            value(enriched, "forbidden_word_depletion_enrichment"),
+            value(enriched, "motif_like_token_recurrence"),
+            value(enriched, "Markov_order_anomaly"),
+            value(enriched, "long_range_dependency_proxy"),
+        ]
+    )
+    quantum = value(enriched, "nonB_physical_susceptibility_score")
+    replication = value(enriched, "fork_texture_score")
+    decoherence = value(enriched, "decoherence_boundary_candidate_score")
+    resonant = np.mean(
+        [
+            value(enriched, "phase_periodicity_around_10bp"),
+            value(enriched, "nucleosome_scale_periodicity_around_147bp"),
+            value(enriched, "spacing_periodicity_fourier_power"),
+        ]
+    )
+    hysteresis = np.mean(
+        [
+            abs(value(enriched, "left_right_GC_asymmetry")),
+            value(enriched, "nested_repeat_architecture_score"),
+            value(enriched, "non_B_DNA_aggregate_score"),
+            value(enriched, "orientation_bias_of_recurrent_kmers"),
+        ]
+    )
+    negative = np.mean(
+        [
+            value(enriched, "depleted_kmer_score"),
+            value(enriched, "unexpected_silence_score"),
+            value(enriched, "local_feature_void_score"),
+        ]
+    )
+    boundary = value(enriched, "boundary_condition_candidate_score")
+    te = np.mean([value(enriched, "TE_overlap_fraction"), value(enriched, "TE_family_mosaic_score"), value(enriched, "TE_boundary_score")])
+    # Prompt 1 can only derive static sequence-compatible candidate proxies for
+    # dynamic labels. It does not infer future states, thresholds, memory, or
+    # trajectories without Prompt 2 dynamic data.
+    possibility = np.mean([boundary, negative, value(enriched, "forbidden_word_depletion_enrichment")])
+    criticality = np.mean([boundary, value(enriched, "entropy_boundary_score"), value(enriched, "compression_boundary_score")])
+    chromatin_motion = np.mean(
+        [
+            value(enriched, "spacing_periodicity_autocorrelation"),
+            value(enriched, "DNA_bendability_proxy"),
+            value(enriched, "left_right_entropy_asymmetry"),
+        ]
+    )
+    scores = {
+        "fractal_scaffold_candidate_score": float(fractal),
+        "constraint_grammar_region_candidate_score": float(grammar),
+        "quantum_susceptible_domain_candidate_score": float(quantum),
+        "replication_instability_candidate_score": float(replication),
+        "decoherence_boundary_candidate_score": float(decoherence),
+        "resonant_pulse_decoder_candidate_score": float(resonant),
+        "hysteresis_candidate_score": float(hysteresis),
+        "possibility_gate_candidate_score": float(possibility),
+        "criticality_tuner_candidate_score": float(criticality),
+        "chromatin_motion_oscillator_candidate_score": float(chromatin_motion),
+        "negative_space_element_candidate_score": float(negative),
+        "sequence_regime_boundary_candidate_score": float(boundary),
+        "TE_grammar_node_candidate_score": float(te),
+    }
+    scores["unexplained_dark_anomaly_candidate_score"] = float(np.nanmean(list(scores.values())))
+    return scores
+
+
+def score_primitives(features: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for row in features.to_dict(orient="records"):
+        identity = {k: row.get(k) for k in ["region_id", "chrom", "start", "end"] if k in row}
+        scores = primitive_scores_for_row(row)
+        rows.append({**identity, **scores})
+    out = pd.DataFrame(rows)
+    for col in PRIMITIVE_SCORE_COLUMNS:
+        if col not in out.columns:
+            out[col] = 0.0
+        out[f"{col}_robust_zscore"] = robust_scale_series(out[col].fillna(0.0))
+        values = out[col].fillna(0.0).to_numpy()
+        out[f"{col}_empirical_p_value"] = [empirical_p_value(v, values, higher=True) for v in values]
+    return out
+
+
+def write_primitive_scores(scores: pd.DataFrame, outdir: str | Path) -> Path:
+    out = Path(outdir)
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / "primitive_scores.parquet"
+    scores.to_parquet(path, index=False)
+    return path
