@@ -1,21 +1,30 @@
-MIT License
+DarkDNA Observer Source-Available Evaluation License
 
 Copyright (c) 2026 Filippo Bergeretti
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+All rights reserved.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This repository, including its source code, documentation, examples, assets, figures, logos, project structure, sequence-analysis logic, genomic feature definitions, scoring concepts, and associated research ideas, is made publicly available for viewing, evaluation, and portfolio-review purposes only.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You may view the contents of this repository on GitHub.
+
+You may not, without explicit prior written permission from the copyright holder:
+
+- copy this software or substantial portions of it;
+- modify, adapt, translate, or create derivative works from it;
+- redistribute, publish, mirror, sublicense, sell, rent, or otherwise transfer it;
+- use it for commercial, institutional, consulting, product-development, or service-delivery purposes;
+- incorporate it into another software project, biological analysis pipeline, genome-analysis workflow, model-training dataset, publication pipeline, or commercial system;
+- use the project name, logo, visual identity, terminology, or associated branding in a way that suggests endorsement, authorship, collaboration, or permission.
+
+No patent, trademark, database, model-training, or commercial-use rights are granted.
+
+Forking or viewing this repository through GitHub does not grant any rights beyond those required to view the repository on the GitHub platform.
+
+Scientific and research note:
+DarkDNA Observer is an exploratory genomic feature-analysis project. Any "quantum-susceptible" or similarly named feature should be interpreted conservatively as a physical-susceptibility proxy based on sequence composition and context, such as G-richness, G4 potential, oxidation-prone contexts, G-skewness, non-B-DNA propensity, and charge-transfer-like sequence contexts. This project does not claim to demonstrate actual quantum effects in genomic sequences.
+
+For permission requests or licensing inquiries, contact:
+
+Filippo Bergeretti
+fbergeretti@gmail.com
