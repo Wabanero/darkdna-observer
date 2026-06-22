@@ -278,4 +278,18 @@ C:\Users\User\miniconda3\envs\genetichyper\python.exe -m pytest -q
 
 ## License
 
+This project is **source-available**, but it is **not open source**.
+
+Copyright © 2026 Filippo Bergeretti. All rights reserved.
+
+The code, documentation, examples, assets, logos, genomic feature definitions, scoring concepts, sequence-analysis logic, and associated research ideas are publicly visible for evaluation and portfolio-review purposes only.
+
+You may not copy, modify, redistribute, repackage, publish, sublicense, use commercially, or create derivative works from this project without explicit written permission.
+
+Scientific note: this project treats "quantum-susceptible" sequence regions conservatively as physical-susceptibility proxies based on sequence composition and context. It does not claim to demonstrate actual quantum effects in genomic sequences.
+
+See [`LICENSE`](./LICENSE) for the full terms.
+
+## License
+
 MIT
