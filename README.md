@@ -26,11 +26,11 @@ Primitive names are operational candidate labels. All high-priority candidates s
 
 ## Candidate Proxies vs Confirmed Dynamic Primitives
 
-Prompt 1 is sequence-first. It can detect candidate substrates with intrinsic sequence architectures compatible with memory, rhythm, boundary, physical susceptibility, negative-space, TE grammar, or scale-constraint hypotheses.
+It can detect candidate substrates with intrinsic sequence architectures compatible with memory, rhythm, boundary, physical susceptibility, negative-space, TE grammar, or scale-constraint hypotheses.
 
-It cannot infer true future-state bias, hysteresis, active inference, transition thresholds, possibility gates, or teleological behavior from static sequence alone. Those require Prompt 2 dynamic data: time-course, perturbation, pseudotime, state-transition graphs, single-cell data, recovery experiments, live-locus motion, or dose gradients.
+It cannot infer true future-state bias, hysteresis, active inference, transition thresholds, possibility gates, or teleological behavior from static sequence alone. Those require dynamic data: time-course, perturbation, pseudotime, state-transition graphs, single-cell data, recovery experiments, live-locus motion, or dose gradients.
 
-Prompt 1 therefore emits candidate labels such as:
+Candidate labels:
 
 - `fractal_scaffold_candidate`
 - `constraint_grammar_region_candidate`
@@ -211,7 +211,7 @@ Genome browser tracks include:
 
 ## Region Cards
 
-Every Prompt 1 region card states:
+Every region card states:
 
 ```text
 This is a sequence-derived candidate hypothesis, not a confirmed biological primitive.
@@ -228,7 +228,7 @@ Cards include:
 - classical covariates controlled
 - allowed and forbidden interpretation
 - required validation data
-- suggested Prompt 2 view
+- suggested view
 - recommended primitive assay
 - recommended classical validation assay
 - control sequence design
