@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from darkdna.utils.optional_deps import optional_import
+from darkdna.utils.progress import ProgressReporter
 from darkdna.utils.stats import empirical_p_value
 from darkdna.views.primitive_scores import PRIMITIVE_SCORE_COLUMNS
 
@@ -81,17 +82,25 @@ def pure_numpy_linear_predict(X: pd.DataFrame, y: pd.Series, steps: int = 800, l
 
     x = X.to_numpy(dtype=float)
     target = y.to_numpy(dtype=float)
+    target_mean = float(np.nanmean(target))
+    target_std = float(np.nanstd(target))
+    if not np.isfinite(target_std) or target_std == 0.0:
+        return np.repeat(target_mean if np.isfinite(target_mean) else 0.0, len(target))
+    target_z = (target - target_mean) / target_std
     means = x.mean(axis=0)
     stds = x.std(axis=0)
     stds[stds == 0] = 1.0
     z = (x - means) / stds
+    z = np.nan_to_num(z, nan=0.0, posinf=0.0, neginf=0.0)
     design = np.c_[np.ones(len(z)), z]
     weights = np.zeros(design.shape[1], dtype=float)
     for _ in range(steps):
         pred = design @ weights
-        grad = (design.T @ (pred - target)) / max(1, len(target))
+        grad = (design.T @ (pred - target_z)) / max(1, len(target_z))
+        grad = np.clip(np.nan_to_num(grad, nan=0.0, posinf=1e3, neginf=-1e3), -1e3, 1e3)
         weights -= learning_rate * grad
-    return design @ weights
+    pred_z = np.nan_to_num(design @ weights, nan=0.0, posinf=0.0, neginf=0.0)
+    return pred_z * target_std + target_mean
 
 
 def residualize_scores(
@@ -99,14 +108,21 @@ def residualize_scores(
     covariates: pd.DataFrame,
     nulls: pd.DataFrame | None = None,
     method: str = "linear",
+    *,
+    progress: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     data = scores.merge(covariates, on="region_id", how="left", suffixes=("", "_cov"))
     rows = []
     summaries = []
-    for primitive in [col for col in PRIMITIVE_SCORE_COLUMNS if col in scores.columns]:
+    primitives = [col for col in PRIMITIVE_SCORE_COLUMNS if col in scores.columns]
+    reporter = ProgressReporter("residualize", total=len(primitives)) if progress else None
+    if reporter:
+        reporter.start(f"residualizing primitives method={method}")
+    for idx, primitive in enumerate(primitives, start=1):
         cov_cols = numeric_covariates(data, primitive)
         pred, used_method = fit_predict(data[cov_cols], data[primitive], method=method)
         obs = pd.to_numeric(data[primitive], errors="coerce").fillna(0.0).to_numpy()
+        pred = np.nan_to_num(pred, nan=float(np.nanmean(obs) if len(obs) else 0.0), posinf=0.0, neginf=0.0)
         residual = obs - pred
         residual_std = np.std(residual, ddof=1) if len(residual) > 1 else 0.0
         residual_z = residual / residual_std if residual_std and np.isfinite(residual_std) else np.zeros_like(residual)
@@ -145,6 +161,10 @@ def residualize_scores(
                 "residual_std": float(residual_std),
             }
         )
+        if reporter:
+            reporter.update(idx, message=f"{primitive} covariates={len(cov_cols)}")
+    if reporter:
+        reporter.finish()
     return pd.DataFrame(rows), pd.DataFrame(summaries)
 
 

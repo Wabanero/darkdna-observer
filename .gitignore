@@ -19,14 +19,12 @@ darkdna_run/
 demo/
 toy_darkdna/
 
-# Optional real reference downloads should be prepared locally, not committed.
-data/reference/*/genome.fa
-data/reference/*/genome.fa.fai
-data/reference/*/chrom.sizes
-data/reference/*/genes.gff3
-data/reference/*/te_annotation.gff3
-data/reference/*/blacklist.bed
-data/reference/*/mappability.bedGraph
+# Temporary source downloads used to regenerate committed reference subsets.
+data/reference/*/_download/
+data/reference/*/_source.fa
+data/reference/*/_source.gff3
+data/reference/*/_source_te.gff3
+data/reference/arabidopsis_TAIR10_full/
 
 # Generated toy pipeline outputs; committed toy fixtures are listed explicitly
 # under data/toy in README/data documentation.

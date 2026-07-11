@@ -21,6 +21,13 @@ def distribution_shift(left: dict[str, float], right: dict[str, float]) -> float
     return float(sum(abs(left.get(k, 0.0) - right.get(k, 0.0)) for k in keys) / 2)
 
 
+def repeat_proxy_for_block(seq: str) -> float:
+    if not seq:
+        return 0.0
+    entropy = shannon_entropy(seq)
+    return float(max(0.0, min(1.0, 1.0 - entropy / 2.0)))
+
+
 def sliding_transition(seq: str, block: int = 50) -> float:
     seq = clean_sequence(seq)
     if len(seq) < 20:
@@ -29,11 +36,12 @@ def sliding_transition(seq: str, block: int = 50) -> float:
     values = []
     for idx in range(0, max(1, len(seq) - block + 1), block):
         chunk = seq[idx : idx + block]
-        values.append([gc_content(chunk), shannon_entropy(chunk), simple_repeat_fraction(chunk)])
+        values.append([gc_content(chunk), shannon_entropy(chunk), repeat_proxy_for_block(chunk)])
     arr = np.array(values, dtype=float)
     if len(arr) < 2:
         return 0.0
-    return float(np.nanmax(np.linalg.norm(np.diff(arr, axis=0), axis=1)))
+    diffs = np.diff(arr, axis=0)
+    return float(np.nanmax(np.sqrt(np.nansum(diffs * diffs, axis=1))))
 
 
 def rupture_breakpoint_score(seq: str) -> float:

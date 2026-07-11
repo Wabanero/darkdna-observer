@@ -1,11 +1,12 @@
 # yeast_R64_chrI
 
-Optional Level B real-genome technical integration fixture.
+Saccharomyces cerevisiae S288C/R64 chromosome I technical integration fixture.
 
-This directory intentionally does not include full yeast reference downloads by default. Generate the small chromosome-I subset with:
+- Prepared: 2026-06-16
+- Region: I:1-230218
+- Output chromosome name: chrI
+- Download used: True
+- Source directory: data\reference\yeast_R64_chrI\_download
+- TE/mappability/blacklist note: No TE annotation required for yeast technical fixture.
 
-```bash
-python scripts/prepare_test_references.py --dataset yeast_R64_chrI --no-download --source-dir /path/to/local/source --out data/reference/yeast_R64_chrI
-```
-
-Normal pytest skips the yeast integration test unless `genome.fa`, `chrom.sizes`, and `genes.gff3` exist.
+Full genomes should not be committed to this repository.

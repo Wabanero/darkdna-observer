@@ -7,6 +7,7 @@ claim experimentally confirmed structures.
 from __future__ import annotations
 
 import numpy as np
+from collections import Counter
 
 from .repeats import g_tract_density
 from .sequence import clean_sequence
@@ -36,21 +37,22 @@ def repeat_density(seq: str, mode: str = "direct", k: int = 6) -> float:
     if len(seq) < 2 * k:
         return 0.0
     comp = str.maketrans("ACGT", "TGCA")
+    counts = Counter(seq[i : i + k] for i in range(len(seq) - k + 1) if "N" not in seq[i : i + k])
+    total = sum(counts.values())
+    if total == 0:
+        return 0.0
     hits = 0
-    total = 0
-    for i in range(len(seq) - k + 1):
-        token = seq[i : i + k]
-        if "N" in token:
-            continue
-        target = token
-        if mode == "inverted":
-            target = token.translate(comp)[::-1]
+    for token, count in counts.items():
+        if mode == "direct":
+            if count > 1:
+                hits += count
+        elif mode == "inverted":
+            if counts.get(token.translate(comp)[::-1], 0) > 0:
+                hits += count
         elif mode == "mirror":
-            target = token[::-1]
-        total += 1
-        if seq.find(target, i + k) >= 0:
-            hits += 1
-    return hits / max(1, total)
+            if counts.get(token[::-1], 0) > 0:
+                hits += count
+    return hits / total
 
 
 def compute_nonb_dna_features(seq: str) -> dict[str, float]:

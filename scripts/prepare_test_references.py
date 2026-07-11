@@ -25,25 +25,25 @@ from scripts.subset_reference import parse_region, subset_gff3, subset_fasta, wr
 
 DATASETS = {
     "yeast_R64_chrI": {
-        "region": "chrI:1-230218",
+        "region": "I:1-230218",
         "out_chrom": "chrI",
         "readme": "Saccharomyces cerevisiae S288C/R64 chromosome I technical integration fixture.",
         "fasta_candidates": ["genome.fa", "Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa"],
         "gff3_candidates": ["genes.gff3", "Saccharomyces_cerevisiae.R64-1-1.60.gff3"],
         "download_note": "Provide R64 FASTA and GFF3 from SGD/Ensembl/Fungi if automatic URLs fail.",
-        "fasta_url": "",
-        "gff3_url": "",
+        "fasta_url": "https://ftp.ensemblgenomes.ebi.ac.uk/pub/fungi/release-60/fasta/saccharomyces_cerevisiae/dna/Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa.gz",
+        "gff3_url": "https://ftp.ensemblgenomes.ebi.ac.uk/pub/fungi/release-60/gff3/saccharomyces_cerevisiae/Saccharomyces_cerevisiae.R64-1-1.60.gff3.gz",
     },
     "arabidopsis_TAIR10_chr1_2Mb": {
-        "region": "Chr1:1-2000000",
+        "region": "1:1-2000000",
         "out_chrom": "Chr1",
         "readme": "Arabidopsis thaliana TAIR10 chromosome 1 first 2 Mb plant/non-model fixture.",
         "fasta_candidates": ["genome.fa", "Arabidopsis_thaliana.TAIR10.dna.toplevel.fa"],
         "gff3_candidates": ["genes.gff3", "Arabidopsis_thaliana.TAIR10.60.gff3"],
         "te_candidates": ["te_annotation.gff3", "TAIR10_TE.gff3"],
         "download_note": "Provide TAIR10 FASTA/GFF3/optional TE annotation from EnsemblPlants/Araport/TAIR if automatic URLs fail.",
-        "fasta_url": "",
-        "gff3_url": "",
+        "fasta_url": "https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-60/fasta/arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz",
+        "gff3_url": "https://ftp.ensemblgenomes.ebi.ac.uk/pub/plants/release-60/gff3/arabidopsis_thaliana/Arabidopsis_thaliana.TAIR10.60.gff3.gz",
     },
 }
 

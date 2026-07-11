@@ -10,6 +10,7 @@ import pandas as pd
 
 from darkdna.primitives.assay_recommender import recommend_assay
 from darkdna.primitives.ontology import get_primitive
+from darkdna.utils.progress import ProgressReporter
 
 
 def top_scores_for_region(residuals: pd.DataFrame, region_id: str, n: int = 5) -> list[dict]:
@@ -53,9 +54,6 @@ def build_region_card(
     primitive = str(label.get("primitive_class", "unexplained_dark_anomaly_candidate"))
     assay = recommend_assay(primitive)
     ontology = get_primitive(primitive)
-    feature_row = None
-    if features is not None and not features.empty and region_id in set(features["region_id"].astype(str)):
-        feature_row = features.loc[features["region_id"].astype(str) == region_id].iloc[0]
     supporting = str(label.get("top_supporting_features", "")).split(";") if pd.notna(label.get("top_supporting_features", "")) else []
     conflicting = []
     if str(window.get("artifact_risk_flags", "")):
@@ -119,16 +117,25 @@ def make_region_cards(
     residuals: pd.DataFrame,
     features: pd.DataFrame | None = None,
     top_n: int | None = None,
+    *,
+    progress: bool = False,
 ) -> list[dict]:
     merged = labels.merge(windows, on="region_id", how="left", suffixes=("_label", ""))
     merged = merged.sort_values("primitive_confidence", ascending=False)
     if top_n:
         merged = merged.head(top_n)
     cards = []
-    for row in merged.iterrows():
+    reporter = ProgressReporter("make-region-cards", total=len(merged)) if progress else None
+    if reporter:
+        reporter.start("building assay cards")
+    for idx, row in enumerate(merged.iterrows(), start=1):
         record = row[1]
         card = build_region_card(record, record, residuals, features=features)
         cards.append(card)
+        if reporter:
+            reporter.update(idx, message=str(record.get("region_id", "")))
+    if reporter:
+        reporter.finish()
     return cards
 
 

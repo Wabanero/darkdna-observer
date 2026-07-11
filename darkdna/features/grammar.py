@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import random
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -18,11 +17,18 @@ def autocorrelation_periodicity(seq: str, mapping: dict[str, float] | None = Non
         return {"best_lag": 0.0, "best_score": 0.0, "lag_10_score": 0.0, "lag_147_score": 0.0}
     mapping = mapping or {"G": 1.0, "C": 1.0, "A": -1.0, "T": -1.0, "N": 0.0}
     x = np.array([mapping.get(base, 0.0) for base in seq], dtype=float)
-    x = x - x.mean()
+    x = x - float(np.mean(x))
+    max_lag = min(max_lag, len(seq) - 1)
+    fft_size = 1 << ((2 * len(x) - 1).bit_length())
+    spectrum = np.fft.rfft(x, fft_size)
+    autocov = np.fft.irfft(spectrum * np.conj(spectrum), fft_size)[: max_lag + 1]
+    square_prefix = np.concatenate(([0.0], np.cumsum(x * x)))
     scores = {}
-    for lag in range(1, min(max_lag, len(seq) - 1) + 1):
-        denom = np.linalg.norm(x[:-lag]) * np.linalg.norm(x[lag:])
-        scores[lag] = float(np.dot(x[:-lag], x[lag:]) / denom) if denom else 0.0
+    for lag in range(1, max_lag + 1):
+        left_sq = square_prefix[len(x) - lag] - square_prefix[0]
+        right_sq = square_prefix[len(x)] - square_prefix[lag]
+        denom = float(np.sqrt(left_sq) * np.sqrt(right_sq))
+        scores[lag] = float(autocov[lag] / denom) if denom else 0.0
     best_lag, best_score = max(scores.items(), key=lambda item: abs(item[1])) if scores else (0, 0.0)
     return {
         "best_lag": float(best_lag),
@@ -44,19 +50,13 @@ def fourier_summary(seq: str) -> dict[str, float]:
     return {"fourier_peak_frequency": float(idx / len(seq)), "fourier_peak_power": float(spectrum[idx] / max(1.0, spectrum.sum()))}
 
 
-def shuffled_forbidden_word_score(seq: str, k: int = 4, shuffles: int = 20, seed: int = 13) -> float:
+def shuffled_forbidden_word_score(seq: str, k: int = 4, shuffles: int = 0, seed: int = 13) -> float:
     seq = clean_sequence(seq)
     observed = len(kmer_counts(seq, k))
     if len(seq) < k:
         return 0.0
-    rng = random.Random(seed)
-    expected = []
-    bases = list(seq)
-    for _ in range(shuffles):
-        rng.shuffle(bases)
-        expected.append(len(kmer_counts("".join(bases), k)))
-    mean = float(np.mean(expected)) if expected else observed
-    return max(0.0, (mean - observed) / max(1.0, mean))
+    expected = min(4**k, len(seq) - k + 1)
+    return max(0.0, (expected - observed) / max(1.0, expected))
 
 
 def entropy_cliffs(seq: str, block: int = 50) -> float:

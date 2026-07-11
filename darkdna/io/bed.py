@@ -68,10 +68,11 @@ def overlaps_any(chrom: str, start: int, end: int, intervals: pd.DataFrame) -> b
     if intervals is None or intervals.empty:
         return False
     subset = intervals[intervals["chrom"].astype(str) == str(chrom)]
-    for row in subset.itertuples():
-        if interval_overlap_bp(start, end, int(row.start), int(row.end)) > 0:
-            return True
-    return False
+    if subset.empty:
+        return False
+    starts = pd.to_numeric(subset["start"], errors="coerce")
+    ends = pd.to_numeric(subset["end"], errors="coerce")
+    return bool(((starts < int(end)) & (ends > int(start))).any())
 
 
 def overlap_fraction(chrom: str, start: int, end: int, intervals: pd.DataFrame) -> float:
@@ -79,26 +80,29 @@ def overlap_fraction(chrom: str, start: int, end: int, intervals: pd.DataFrame) 
         return 0.0
     length = max(1, int(end) - int(start))
     subset = intervals[intervals["chrom"].astype(str) == str(chrom)]
-    overlap = 0
-    for row in subset.itertuples():
-        overlap += interval_overlap_bp(start, end, int(row.start), int(row.end))
-    return min(1.0, overlap / length)
+    if subset.empty:
+        return 0.0
+    starts = pd.to_numeric(subset["start"], errors="coerce")
+    ends = pd.to_numeric(subset["end"], errors="coerce")
+    overlaps = (np.minimum(ends, int(end)) - np.maximum(starts, int(start))).clip(lower=0)
+    return min(1.0, float(overlaps.sum()) / length)
 
 
 def weighted_interval_mean(chrom: str, start: int, end: int, intervals: pd.DataFrame, value_col: str = "value") -> float:
     if intervals is None or intervals.empty or value_col not in intervals.columns:
         return np.nan
     length = max(1, int(end) - int(start))
-    total = 0.0
-    weight = 0
     subset = intervals[intervals["chrom"].astype(str) == str(chrom)]
-    for row in subset.itertuples():
-        bp = interval_overlap_bp(start, end, int(row.start), int(row.end))
-        if bp > 0:
-            total += bp * float(getattr(row, value_col))
-            weight += bp
+    if subset.empty:
+        return np.nan
+    starts = pd.to_numeric(subset["start"], errors="coerce")
+    ends = pd.to_numeric(subset["end"], errors="coerce")
+    values = pd.to_numeric(subset[value_col], errors="coerce").fillna(0.0)
+    overlaps = (np.minimum(ends, int(end)) - np.maximum(starts, int(start))).clip(lower=0)
+    weight = float(overlaps.sum())
     if weight == 0:
         return np.nan
+    total = float((overlaps * values).sum())
     return float(total / length)
 
 
@@ -130,11 +134,15 @@ def collect_overlapping_values(
         return []
     values: list[str] = []
     subset = intervals[intervals["chrom"].astype(str) == str(chrom)]
-    for row in subset.itertuples():
-        if interval_overlap_bp(start, end, int(row.start), int(row.end)) > 0:
-            value = getattr(row, value_col)
-            if pd.notna(value) and str(value) not in values:
-                values.append(str(value))
+    if subset.empty:
+        return values
+    starts = pd.to_numeric(subset["start"], errors="coerce")
+    ends = pd.to_numeric(subset["end"], errors="coerce")
+    mask = (starts < int(end)) & (ends > int(start))
+    for value in subset.loc[mask, value_col].dropna():
+        text = str(value)
+        if text not in values:
+            values.append(text)
         if len(values) >= max_values:
             break
     return values

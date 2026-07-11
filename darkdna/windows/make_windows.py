@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Iterable
 
@@ -23,6 +24,7 @@ from darkdna.io.genome import is_unplaced_or_unlocalized, load_genome_sizes, sca
 from darkdna.io.gff import annotation_tables, read_te_annotation
 from darkdna.io.validators import ensure_region_schema
 from darkdna.utils.config import DEFAULT_ARTIFACT_THRESHOLDS
+from darkdna.utils.progress import ProgressReporter, progress_message
 from .multiscale import assign_multiscale_context, scale_level_for_size
 
 
@@ -59,6 +61,41 @@ def low_complexity_fraction(seq: str) -> float:
     return float(runs / len(seq))
 
 
+def sequence_stat_prefixes(seq: str) -> dict[str, np.ndarray]:
+    seq = seq.upper()
+    arr = np.frombuffer(seq.encode("ascii"), dtype=np.uint8)
+    low_complexity = np.zeros(len(arr), dtype=np.uint8)
+    for match in re.finditer(r"([ACGTN])\1{4,}", seq):
+        low_complexity[match.start() : match.end()] = 1
+
+    def prefix(mask: np.ndarray) -> np.ndarray:
+        out = np.empty(len(mask) + 1, dtype=np.int32)
+        out[0] = 0
+        out[1:] = np.cumsum(mask, dtype=np.int32)
+        return out
+
+    return {
+        "gc": prefix((arr == ord("G")) | (arr == ord("C"))),
+        "n": prefix(arr == ord("N")),
+        "low_complexity": prefix(low_complexity),
+    }
+
+
+def sequence_stats_from_prefixes(prefixes: dict[str, np.ndarray] | None, start: int, end: int) -> tuple[float, float, float]:
+    if prefixes is None:
+        return np.nan, np.nan, np.nan
+    max_len = len(prefixes["gc"]) - 1
+    start = max(0, min(int(start), max_len))
+    end = max(start, min(int(end), max_len))
+    length = max(1, end - start)
+    n_count = int(prefixes["n"][end] - prefixes["n"][start])
+    gc_count = int(prefixes["gc"][end] - prefixes["gc"][start])
+    low_count = int(prefixes["low_complexity"][end] - prefixes["low_complexity"][start])
+    usable = max(0, length - n_count)
+    gc = float(gc_count / usable) if usable else np.nan
+    return gc, float(n_count / length), float(low_count / length)
+
+
 def generate_windows_for_chrom(chrom: str, size: int, window_size: int, step: int) -> Iterable[dict]:
     if size <= 0:
         return
@@ -77,6 +114,123 @@ def load_optional_bed(path: str | Path | None) -> pd.DataFrame:
     return read_bed(path) if path else pd.DataFrame(columns=["chrom", "start", "end"])
 
 
+def build_interval_index(df: pd.DataFrame, value_col: str | None = None) -> dict[str, dict[str, object]]:
+    if df is None or df.empty or not {"chrom", "start", "end"}.issubset(df.columns):
+        return {}
+    work = df.copy()
+    work["_start_num"] = pd.to_numeric(work["start"], errors="coerce")
+    work["_end_num"] = pd.to_numeric(work["end"], errors="coerce")
+    work = work.dropna(subset=["_start_num", "_end_num"])
+    work["_start_num"] = work["_start_num"].astype(int)
+    work["_end_num"] = work["_end_num"].astype(int)
+    index: dict[str, dict[str, object]] = {}
+    for chrom, group in work.sort_values(["chrom", "_start_num", "_end_num"]).groupby("chrom", sort=False):
+        group = group.reset_index(drop=True)
+        record: dict[str, object] = {
+            "df": group,
+            "starts": group["_start_num"].to_numpy(dtype=int),
+            "ends": group["_end_num"].to_numpy(dtype=int),
+        }
+        record["max_end_prefix"] = np.maximum.accumulate(record["ends"])  # type: ignore[arg-type]
+        if value_col and value_col in group.columns:
+            record["values"] = pd.to_numeric(group[value_col], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+        index[str(chrom)] = record
+    return index
+
+
+def _indexed_positions(index: dict[str, dict[str, object]], chrom: str, start: int, end: int) -> tuple[dict[str, object] | None, np.ndarray]:
+    record = index.get(str(chrom))
+    if record is None:
+        return None, np.array([], dtype=int)
+    starts = record["starts"]  # type: ignore[index]
+    ends = record["ends"]  # type: ignore[index]
+    cutoff = int(np.searchsorted(starts, int(end), side="left"))
+    if cutoff <= 0:
+        return record, np.array([], dtype=int)
+    mask = ends[:cutoff] > int(start)
+    return record, np.flatnonzero(mask)
+
+
+def indexed_overlaps_any(index: dict[str, dict[str, object]], chrom: str, start: int, end: int) -> bool:
+    record = index.get(str(chrom))
+    if record is None:
+        return False
+    starts = record["starts"]  # type: ignore[index]
+    max_end_prefix = record["max_end_prefix"]  # type: ignore[index]
+    cutoff = int(np.searchsorted(starts, int(end), side="left"))
+    if cutoff <= 0:
+        return False
+    return bool(max_end_prefix[cutoff - 1] > int(start))
+
+
+def indexed_overlap_fraction(index: dict[str, dict[str, object]], chrom: str, start: int, end: int) -> float:
+    record, positions = _indexed_positions(index, chrom, start, end)
+    if record is None or not positions.size:
+        return 0.0
+    starts = record["starts"][positions]  # type: ignore[index]
+    ends = record["ends"][positions]  # type: ignore[index]
+    overlaps = np.minimum(ends, int(end)) - np.maximum(starts, int(start))
+    return min(1.0, float(np.clip(overlaps, 0, None).sum()) / max(1, int(end) - int(start)))
+
+
+def indexed_weighted_interval_mean(index: dict[str, dict[str, object]], chrom: str, start: int, end: int) -> float:
+    record, positions = _indexed_positions(index, chrom, start, end)
+    if record is None or not positions.size or "values" not in record:
+        return np.nan
+    starts = record["starts"][positions]  # type: ignore[index]
+    ends = record["ends"][positions]  # type: ignore[index]
+    values = record["values"][positions]  # type: ignore[index]
+    overlaps = np.clip(np.minimum(ends, int(end)) - np.maximum(starts, int(start)), 0, None)
+    if float(overlaps.sum()) == 0.0:
+        return np.nan
+    return float((overlaps * values).sum() / max(1, int(end) - int(start)))
+
+
+def indexed_collect_values(
+    index: dict[str, dict[str, object]],
+    chrom: str,
+    start: int,
+    end: int,
+    value_col: str,
+    max_values: int = 5,
+) -> list[str]:
+    record, positions = _indexed_positions(index, chrom, start, end)
+    if record is None or not positions.size:
+        return []
+    df = record["df"]  # type: ignore[assignment]
+    if value_col not in df.columns:  # type: ignore[union-attr]
+        return []
+    values: list[str] = []
+    for value in df.iloc[positions][value_col].dropna():  # type: ignore[union-attr]
+        text = str(value)
+        if text and text not in values:
+            values.append(text)
+        if len(values) >= max_values:
+            break
+    return values
+
+
+def nearest_tss_from_index(index: dict[str, dict[str, object]], chrom: str, start: int, end: int) -> tuple[str, float]:
+    record = index.get(str(chrom))
+    if record is None:
+        return "", np.nan
+    starts = record["starts"]  # type: ignore[index]
+    if len(starts) == 0:
+        return "", np.nan
+    center = (int(start) + int(end)) // 2
+    pos = int(np.searchsorted(starts, center, side="left"))
+    candidates = [idx for idx in (pos - 1, pos, pos + 1) if 0 <= idx < len(starts)]
+    if not candidates:
+        return "", np.nan
+    distances = [abs(int(starts[idx]) - center) for idx in candidates]
+    best_pos = candidates[int(np.argmin(distances))]
+    df = record["df"]  # type: ignore[assignment]
+    name = ""
+    if "name" in df.columns:  # type: ignore[union-attr]
+        name = str(df.iloc[best_pos].get("name", ""))  # type: ignore[union-attr]
+    return name, float(abs(int(starts[best_pos]) - center))
+
+
 def annotate_windows(
     windows: pd.DataFrame,
     genome: dict[str, str] | None,
@@ -93,11 +247,14 @@ def annotate_windows(
     centromere_telomere_path: str | Path | None = None,
     promoter_bp: int = 1000,
     artifact_thresholds: dict[str, float] | None = None,
+    progress: bool = False,
 ) -> pd.DataFrame:
     thresholds = {**DEFAULT_ARTIFACT_THRESHOLDS, **(artifact_thresholds or {})}
-    annotations = annotation_tables(annotation_path, promoter_bp=promoter_bp)
+    if progress:
+        progress_message("make-windows", "loading annotation tracks")
+    annotations = annotation_tables(annotation_path, promoter_bp=promoter_bp, progress=progress)
     blacklist = load_optional_bed(blacklist_path)
-    te = read_te_annotation(te_annotation_path)
+    te = read_te_annotation(te_annotation_path, progress=progress)
     ccre = load_optional_bed(ccre_path)
     enhancer = load_optional_bed(enhancer_path)
     explicit_promoter = load_optional_bed(promoter_path)
@@ -105,39 +262,48 @@ def annotate_windows(
     segdups = load_optional_bed(segmental_duplication_path)
     centelo = load_optional_bed(centromere_telomere_path)
     mappability = read_bedgraph(mappability_path) if mappability_path else pd.DataFrame(columns=["chrom", "start", "end", "value"])
+    if progress:
+        progress_message("make-windows", "indexing annotation tracks")
+    annotation_indexes = {key: build_interval_index(value) for key, value in annotations.items()}
+    blacklist_index = build_interval_index(blacklist)
+    te_index = build_interval_index(te)
+    ccre_index = build_interval_index(ccre)
+    enhancer_index = build_interval_index(enhancer)
+    explicit_promoter_index = build_interval_index(explicit_promoter)
+    assembly_gaps_index = build_interval_index(assembly_gaps)
+    segdups_index = build_interval_index(segdups)
+    centelo_index = build_interval_index(centelo)
+    mappability_index = build_interval_index(mappability, value_col="value")
 
     rows = []
-    for row in windows.itertuples():
+    current_chrom = None
+    current_prefixes: dict[str, np.ndarray] | None = None
+    reporter = ProgressReporter("make-windows annotate", total=len(windows)) if progress else None
+    if reporter:
+        reporter.start("annotating windows")
+    for idx, row in enumerate(windows.itertuples(), start=1):
         chrom, start, end = str(row.chrom), int(row.start), int(row.end)
-        seq = genome.get(chrom, "")[start:end] if genome is not None else ""
-        gc = simple_gc(seq) if seq else np.nan
-        nfrac = n_fraction(seq) if seq else np.nan
-        low_complexity = low_complexity_fraction(seq) if seq else np.nan
+        if genome is not None and chrom != current_chrom:
+            current_chrom = chrom
+            current_prefixes = sequence_stat_prefixes(genome.get(chrom, ""))
+            if progress:
+                progress_message("make-windows", f"prepared sequence stats for {chrom}")
+        gc, nfrac, low_complexity = sequence_stats_from_prefixes(current_prefixes, start, end)
         chrom_size = chrom_sizes.get(chrom, end)
         edge = scaffold_edge_distance(start, end, chrom_size)
-        mapp = weighted_interval_mean(chrom, start, end, mappability) if not mappability.empty else np.nan
+        mapp = indexed_weighted_interval_mean(mappability_index, chrom, start, end) if mappability_index else np.nan
 
-        overlaps_exon = overlaps_any(chrom, start, end, annotations["exons"])
-        overlaps_promoter = overlaps_any(chrom, start, end, annotations["promoters"]) or overlaps_any(chrom, start, end, explicit_promoter)
-        overlaps_intron = overlaps_any(chrom, start, end, annotations["introns"])
-        overlaps_utr = overlaps_any(chrom, start, end, annotations["utrs"])
-        overlaps_te = overlaps_any(chrom, start, end, te)
-        overlaps_blacklist = overlaps_any(chrom, start, end, blacklist)
-        overlaps_gap = overlaps_any(chrom, start, end, assembly_gaps)
-        overlaps_segdup = overlaps_any(chrom, start, end, segdups)
-        overlaps_centelo = overlaps_any(chrom, start, end, centelo)
+        overlaps_exon = indexed_overlaps_any(annotation_indexes["exons"], chrom, start, end)
+        overlaps_promoter = indexed_overlaps_any(annotation_indexes["promoters"], chrom, start, end) or indexed_overlaps_any(explicit_promoter_index, chrom, start, end)
+        overlaps_intron = indexed_overlaps_any(annotation_indexes["introns"], chrom, start, end)
+        overlaps_utr = indexed_overlaps_any(annotation_indexes["utrs"], chrom, start, end)
+        overlaps_te = indexed_overlaps_any(te_index, chrom, start, end)
+        overlaps_blacklist = indexed_overlaps_any(blacklist_index, chrom, start, end)
+        overlaps_gap = indexed_overlaps_any(assembly_gaps_index, chrom, start, end)
+        overlaps_segdup = indexed_overlaps_any(segdups_index, chrom, start, end)
+        overlaps_centelo = indexed_overlaps_any(centelo_index, chrom, start, end)
 
-        tss = annotations["tss"]
-        nearest_gene = ""
-        distance_to_nearest_tss = np.nan
-        if not tss.empty:
-            same = tss[tss["chrom"].astype(str) == chrom]
-            center = (start + end) // 2
-            if not same.empty:
-                distances = (same["start"].astype(int) - center).abs()
-                idx = distances.idxmin()
-                nearest_gene = str(same.loc[idx, "name"])
-                distance_to_nearest_tss = float(distances.loc[idx])
+        nearest_gene, distance_to_nearest_tss = nearest_tss_from_index(annotation_indexes["tss"], chrom, start, end)
 
         flags = []
         if np.isfinite(nfrac) and nfrac >= thresholds["high_n_fraction"]:
@@ -154,7 +320,7 @@ def annotate_windows(
             flags.append("centromeric_telomeric_or_proximal_repeat_context")
         if np.isfinite(low_complexity) and low_complexity >= thresholds["extreme_low_complexity"]:
             flags.append("extreme_low_complexity")
-        repeat_frac = overlap_fraction(chrom, start, end, te)
+        repeat_frac = indexed_overlap_fraction(te_index, chrom, start, end)
         if repeat_frac >= thresholds["extreme_repeat_density"]:
             flags.append("extreme_repeat_density")
         if edge <= int(thresholds["scaffold_edge_bp"]):
@@ -178,9 +344,9 @@ def annotate_windows(
                 "overlaps_intron": bool(overlaps_intron),
                 "overlaps_utr": bool(overlaps_utr),
                 "overlaps_TE": bool(overlaps_te),
-                "TE_family": ";".join(collect_overlapping_values(chrom, start, end, te, "family")),
-                "overlaps_cCRE": overlaps_any(chrom, start, end, ccre),
-                "overlaps_enhancer": overlaps_any(chrom, start, end, enhancer),
+                "TE_family": ";".join(indexed_collect_values(te_index, chrom, start, end, "family")),
+                "overlaps_cCRE": indexed_overlaps_any(ccre_index, chrom, start, end),
+                "overlaps_enhancer": indexed_overlaps_any(enhancer_index, chrom, start, end),
                 "overlaps_blacklist": bool(overlaps_blacklist),
                 "overlaps_assembly_gap": bool(overlaps_gap),
                 "overlaps_segmental_duplication": bool(overlaps_segdup),
@@ -194,7 +360,13 @@ def annotate_windows(
                 "artifact_risk_flags": concatenate_flags(flags),
             }
         )
+        if reporter:
+            reporter.update(idx, message=f"{chrom}:{start}-{end}")
     out = pd.DataFrame(rows)
+    if reporter:
+        reporter.finish()
+    if progress:
+        progress_message("make-windows", "assigning multiscale parent/child context")
     out = assign_multiscale_context(out)
     return ensure_region_schema(out)
 
@@ -205,20 +377,46 @@ def make_dark_windows(
     window_sizes: list[int] | None = None,
     step_fraction: float = 0.5,
     exclude_coding_exons: bool = True,
+    progress: bool = False,
     **annotation_kwargs,
 ) -> pd.DataFrame:
+    if progress:
+        progress_message("make-windows", "loading genome sizes")
     sizes = load_genome_sizes(fasta=fasta, chrom_sizes=chrom_sizes_path)
+    mappability_path = annotation_kwargs.get("mappability_path")
+    if mappability_path:
+        mappability = read_bedgraph(mappability_path)
+        if not mappability.empty:
+            for chrom, end in mappability.groupby("chrom")["end"].max().items():
+                sizes.setdefault(str(chrom), int(end))
+    if progress:
+        total_bp = sum(sizes.values())
+        progress_message("make-windows", f"loaded {len(sizes)} sequences ({total_bp:,} bp)")
+        progress_message("make-windows", "loading FASTA sequence")
     genome = read_fasta(fasta) if fasta else None
     window_sizes = window_sizes or [200, 1000, 5000, 10000, 50000]
     rows: list[dict] = []
+    reporter = ProgressReporter("make-windows generate", total=len(sizes) * len(window_sizes)) if progress else None
+    if reporter:
+        reporter.start("generating raw windows")
     for chrom, chrom_size in sizes.items():
         for window_size in window_sizes:
             step = max(1, int(window_size * step_fraction))
+            before = len(rows)
             rows.extend(generate_windows_for_chrom(chrom, chrom_size, int(window_size), step))
+            if reporter:
+                reporter.step(message=f"{chrom} size={window_size} added={len(rows) - before}")
+    if reporter:
+        reporter.finish(f"raw_windows={len(rows)}")
+    if progress:
+        progress_message("make-windows", f"raw windows generated: {len(rows):,}")
     windows = pd.DataFrame(rows)
-    windows = annotate_windows(windows, genome=genome, chrom_sizes=sizes, **annotation_kwargs)
+    windows = annotate_windows(windows, genome=genome, chrom_sizes=sizes, progress=progress, **annotation_kwargs)
     if exclude_coding_exons:
+        before = len(windows)
         windows = windows.loc[~windows["overlaps_exon"].astype(bool)].copy()
+        if progress:
+            progress_message("make-windows", f"excluded coding-exon windows: {before - len(windows):,}; retained={len(windows):,}")
     return ensure_region_schema(windows.reset_index(drop=True))
 
 

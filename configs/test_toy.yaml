@@ -6,7 +6,7 @@ te_annotation: data/toy/toy_te_annotation.gff3
 blacklist: data/toy/toy_blacklist.bed
 mappability: data/toy/toy_mappability.bedGraph
 output_dir: results/test_toy
-window_sizes: [200, 1000, 5000]
+window_sizes: [1000, 5000]
 step_fraction: 0.5
 exclude_coding_exons: true
 n_null: 10

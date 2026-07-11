@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from darkdna.features.classical import artifact_risk_score
+from darkdna.utils.progress import ProgressReporter
 from .assay_recommender import recommend_assay
 
 
@@ -70,11 +71,16 @@ def assign_primitive_labels(
     windows: pd.DataFrame | None = None,
     residual_threshold: float = 2.0,
     matched_null_threshold: float = 2.0,
+    *,
+    progress: bool = False,
 ) -> pd.DataFrame:
     feature_lookup = features.set_index("region_id") if features is not None and not features.empty else pd.DataFrame()
     window_lookup = windows.set_index("region_id") if windows is not None and not windows.empty else pd.DataFrame()
     rows = []
-    for region_id, group in residuals.groupby("region_id"):
+    reporter = ProgressReporter("infer-primitives", total=int(residuals["region_id"].nunique())) if progress else None
+    if reporter:
+        reporter.start("assigning primitive labels")
+    for idx, (region_id, group) in enumerate(residuals.groupby("region_id"), start=1):
         best = _best_residual_for_region(group)
         primitive = SCORE_TO_PRIMITIVE.get(best["primitive"], "unexplained_dark_anomaly_candidate")
         rz = float(best.get("residual_zscore", 0.0) or 0.0)
@@ -101,6 +107,10 @@ def assign_primitive_labels(
                 "recommended_assay": recommend_assay(primitive).get("assay", ""),
             }
         )
+        if reporter:
+            reporter.update(idx, message=str(region_id))
+    if reporter:
+        reporter.finish()
     return pd.DataFrame(rows)
 
 

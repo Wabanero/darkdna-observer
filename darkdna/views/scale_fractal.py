@@ -28,7 +28,7 @@ def simple_slope(x: np.ndarray, y: np.ndarray) -> float:
 def dfa_like_exponent(values: np.ndarray) -> float:
     if values.size < 16:
         return math.nan
-    scales = np.array([s for s in [4, 8, 16, 32, 64, 128] if s < values.size // 2])
+    scales = np.array([s for s in [16, 64, 256] if s < values.size // 2])
     if scales.size < 2:
         return math.nan
     fluctuations = []
@@ -97,9 +97,10 @@ def chaos_game_features(seq: str, k: int) -> dict[str, float]:
 def compute_scale_fractal_features(seq: str) -> dict[str, float | str]:
     seq = clean_sequence(seq)
     walk = numeric_walk(seq, {"G": 1, "C": 1, "A": -1, "T": -1})
-    fourier = fourier_spectrum_summaries(walk)
-    wavelet = wavelet_energy(walk)
-    dfa = dfa_like_exponent(walk)
+    analysis_walk = walk[:: max(1, walk.size // 10000)] if walk.size > 10000 else walk
+    fourier = fourier_spectrum_summaries(analysis_walk)
+    wavelet = wavelet_energy(analysis_walk)
+    dfa = dfa_like_exponent(analysis_walk)
     chaos = {}
     for k in [3, 4, 5, 6]:
         chaos.update(chaos_game_features(seq, k))

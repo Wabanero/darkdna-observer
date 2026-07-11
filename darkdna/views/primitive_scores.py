@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from darkdna.utils.progress import ProgressReporter
 from darkdna.utils.stats import empirical_p_value, robust_scale_series
 from .boundary_conditions import compute_boundary_condition_view
 from .entropy_noise import compute_entropy_noise_view
@@ -118,12 +119,20 @@ def primitive_scores_for_row(row: dict) -> dict[str, float]:
     return scores
 
 
-def score_primitives(features: pd.DataFrame) -> pd.DataFrame:
+def score_primitives(features: pd.DataFrame, *, progress: bool = False) -> pd.DataFrame:
     rows = []
-    for row in features.to_dict(orient="records"):
+    records = features.to_dict(orient="records")
+    reporter = ProgressReporter("score-primitives", total=len(records)) if progress else None
+    if reporter:
+        reporter.start("scoring primitive candidates")
+    for idx, row in enumerate(records, start=1):
         identity = {k: row.get(k) for k in ["region_id", "chrom", "start", "end"] if k in row}
         scores = primitive_scores_for_row(row)
         rows.append({**identity, **scores})
+        if reporter:
+            reporter.update(idx, message=str(identity.get("region_id", "")))
+    if reporter:
+        reporter.finish()
     out = pd.DataFrame(rows)
     for col in PRIMITIVE_SCORE_COLUMNS:
         if col not in out.columns:

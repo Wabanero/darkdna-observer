@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from darkdna.io.bed import write_bed, write_bedgraph
+from darkdna.utils.progress import ProgressReporter, progress_message
 
 
 PRIMITIVE_TRACKS = {
@@ -23,9 +24,18 @@ PRIMITIVE_TRACKS = {
 }
 
 
-def make_tracks(windows: pd.DataFrame, labels: pd.DataFrame, residuals: pd.DataFrame, outdir: str | Path) -> dict[str, Path]:
+def make_tracks(
+    windows: pd.DataFrame,
+    labels: pd.DataFrame,
+    residuals: pd.DataFrame,
+    outdir: str | Path,
+    *,
+    progress: bool = False,
+) -> dict[str, Path]:
     out = Path(outdir)
     out.mkdir(parents=True, exist_ok=True)
+    if progress:
+        progress_message("make-tracks", f"writing tracks to {out}")
     coords = windows[["region_id", "chrom", "start", "end", "artifact_risk_flags"]].copy()
     global_residual = residuals[residuals["primitive"] == "unexplained_dark_anomaly_candidate_score"][["region_id", "residual_zscore"]]
     scored = coords.merge(global_residual, on="region_id", how="left")
@@ -41,7 +51,10 @@ def make_tracks(windows: pd.DataFrame, labels: pd.DataFrame, residuals: pd.DataF
     write_bed(label_coords, primitive_bed, columns=["chrom", "start", "end", "name"])
     paths["primitive_labels"] = primitive_bed
 
-    for primitive, filename in PRIMITIVE_TRACKS.items():
+    reporter = ProgressReporter("make-tracks", total=len(PRIMITIVE_TRACKS)) if progress else None
+    if reporter:
+        reporter.start("writing primitive BED tracks")
+    for idx, (primitive, filename) in enumerate(PRIMITIVE_TRACKS.items(), start=1):
         subset = label_coords[label_coords["primitive_class"] == primitive].copy()
         path = out / filename
         if subset.empty:
@@ -49,6 +62,10 @@ def make_tracks(windows: pd.DataFrame, labels: pd.DataFrame, residuals: pd.DataF
         else:
             write_bed(subset, path, columns=["chrom", "start", "end", "name"])
         paths[primitive] = path
+        if reporter:
+            reporter.update(idx, message=primitive)
+    if reporter:
+        reporter.finish()
 
     artifact_path = out / "artifact_risk_flags.bed"
     artifact = coords[coords["artifact_risk_flags"].fillna("") != ""].copy()

@@ -6,7 +6,7 @@ te_annotation: data/reference/arabidopsis_TAIR10_chr1_2Mb/te_annotation.gff3
 blacklist: data/reference/arabidopsis_TAIR10_chr1_2Mb/blacklist.bed
 mappability: data/reference/arabidopsis_TAIR10_chr1_2Mb/mappability.bedGraph
 output_dir: results/test_arabidopsis_TAIR10_chr1_2Mb
-window_sizes: [200, 1000, 5000, 10000]
+window_sizes: [5000, 10000]
 step_fraction: 0.5
 exclude_coding_exons: true
 n_null: 10

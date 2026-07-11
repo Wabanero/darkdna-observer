@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Iterable
 
 
@@ -12,7 +13,7 @@ LOGGER_NAME = "darkdna"
 def get_logger(name: str = LOGGER_NAME) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:
-        handler = logging.StreamHandler()
+        handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
         logger.addHandler(handler)
     logger.setLevel(logging.INFO)

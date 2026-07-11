@@ -184,6 +184,7 @@ def make_toy_data(outdir: str | Path, seed: int = 42) -> dict[str, Path]:
                 "toy_chr2\ttoy\tLTR_retrotransposon\t40001\t41000\t.\t+\t.\tID=te1;Name=GypsyToy;Class=LTR;Family=GypsyToy;Superfamily=Gypsy;Strand=+;Divergence=0.12",
                 "toy_chr2\ttoy\tDNA_transposon\t40600\t41600\t.\t-\t.\tID=te2;Name=hATToy;Class=DNA;Family=hATToy;Superfamily=hAT;Strand=-;Divergence=0.05",
                 "toy_chr2\ttoy\tLINE_element\t41500\t42400\t.\t+\t.\tID=te3;Name=LINEToy;Class=LINE;Family=LINEToy;Superfamily=L1;Strand=+;Divergence=0.21",
+                "scaffold_A\ttoy\tLTR_retrotransposon\t6601\t7250\t.\t+\t.\tID=te_scaffoldA;Name=GypsyScaffoldToy;Class=LTR;Family=GypsyScaffoldToy;Superfamily=Gypsy;Strand=+;Divergence=0.08",
                 "",
             ]
         ),
@@ -204,7 +205,8 @@ def make_toy_data(outdir: str | Path, seed: int = 42) -> dict[str, Path]:
         "toy_chr1\t76000\t100000\t1.0\n"
         "toy_chr2\t0\t80000\t1.0\n"
         "toy_scaffoldA\t0\t2000\t0.35\n"
-        "toy_scaffoldA\t2000\t50000\t1.0\n",
+        "toy_scaffoldA\t2000\t50000\t1.0\n"
+        "contig_unplaced_01\t0\t5000\t0.25\n",
         encoding="utf-8",
     )
 

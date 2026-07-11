@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from darkdna.io.fasta import read_fasta
+from darkdna.utils.progress import ProgressReporter, progress_message
 from darkdna.utils.stats import safe_divide, shannon_entropy
 from .repeats import g_tract_density, homopolymer_runs, palindrome_density, periodicity_proxy, simple_repeat_fraction
 
@@ -218,13 +219,22 @@ def compute_all_sequence_features(seq: str, controls: Iterable[str] | None = Non
     return features
 
 
-def extract_features_for_windows(windows: pd.DataFrame, fasta: str | Path) -> pd.DataFrame:
+def extract_features_for_windows(windows: pd.DataFrame, fasta: str | Path, *, progress: bool = False) -> pd.DataFrame:
+    if progress:
+        progress_message("extract-features", "loading FASTA sequence")
     genome = read_fasta(fasta)
     rows = []
-    for row in windows.itertuples():
+    reporter = ProgressReporter("extract-features", total=len(windows)) if progress else None
+    if reporter:
+        reporter.start("computing sequence features")
+    for idx, row in enumerate(windows.itertuples(), start=1):
         seq = genome.get(str(row.chrom), "")[int(row.start) : int(row.end)]
         features = compute_all_sequence_features(seq)
         rows.append({"region_id": row.region_id, "chrom": row.chrom, "start": row.start, "end": row.end, **features})
+        if reporter:
+            reporter.update(idx, message=str(row.region_id))
+    if reporter:
+        reporter.finish()
     return pd.DataFrame(rows)
 
 

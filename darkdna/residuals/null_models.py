@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from darkdna.utils.progress import ProgressReporter
 from darkdna.utils.stats import empirical_p_value
 from darkdna.views.primitive_scores import PRIMITIVE_SCORE_COLUMNS
 
@@ -103,6 +104,8 @@ def build_matched_null_models(
     scores: pd.DataFrame,
     features: pd.DataFrame | None = None,
     n_controls: int = 25,
+    *,
+    progress: bool = False,
 ) -> pd.DataFrame:
     features = features if features is not None and not features.empty else scores[["region_id"]].copy()
     if "region_id" not in features.columns:
@@ -110,7 +113,11 @@ def build_matched_null_models(
     merged_scores = scores.set_index("region_id")
     rows = []
     available_score_cols = [col for col in PRIMITIVE_SCORE_COLUMNS if col in scores.columns]
-    for region_id in scores["region_id"].astype(str):
+    region_ids = scores["region_id"].astype(str).tolist()
+    reporter = ProgressReporter("build-null-models", total=len(region_ids)) if progress else None
+    if reporter:
+        reporter.start(f"matching controls n_controls={n_controls}")
+    for idx, region_id in enumerate(region_ids, start=1):
         controls = select_matched_controls(features, region_id, n=n_controls)
         if controls.empty:
             controls = features.loc[features["region_id"].astype(str) != region_id]
@@ -137,6 +144,10 @@ def build_matched_null_models(
                     "matched_features_used": ",".join(matched_feature_columns(features)),
                 }
             )
+        if reporter:
+            reporter.update(idx, message=region_id)
+    if reporter:
+        reporter.finish()
     return pd.DataFrame(rows)
 
 

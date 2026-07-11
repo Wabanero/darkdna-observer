@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 import numpy as np
@@ -31,17 +32,9 @@ def simple_repeat_fraction(seq: str, min_period: int = 1, max_period: int = 6, m
         return 0.0
     covered = np.zeros(len(seq), dtype=bool)
     for period in range(min_period, max_period + 1):
-        for start in range(0, max(0, len(seq) - period * min_copies + 1)):
-            unit = seq[start : start + period]
-            if "N" in unit or len(set(unit)) == 0:
-                continue
-            copies = 1
-            pos = start + period
-            while pos + period <= len(seq) and seq[pos : pos + period] == unit:
-                copies += 1
-                pos += period
-            if copies >= min_copies:
-                covered[start:pos] = True
+        pattern = re.compile(f"([ACGT]{{{period}}})(?:\\1){{{min_copies - 1},}}")
+        for match in pattern.finditer(seq):
+            covered[match.start() : match.end()] = True
     return float(covered.mean())
 
 
