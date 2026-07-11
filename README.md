@@ -14,6 +14,12 @@ engine. Its job is narrower: rank genomic windows whose intrinsic sequence
 architecture is unusual after classical covariates, matched null models, and
 artifact flags have been considered.
 
+Final mission: find dark DNA regions that may encode constraints on biological
+trajectories rather than classical molecular products. In practical terms, the
+tool asks whether a noncoding window may shape behavior, noise, timing, memory,
+folding, or future-state accessibility, then turns that possibility into a
+candidate-only region card and a validation assay.
+
 ## What It Does
 
 DarkDNA-Observer starts from genomic windows rather than genes. It can exclude
@@ -63,6 +69,35 @@ sequence evidence that dominates after residualization and matched-null review.
 
 Every primitive score is paired with robust z-scores, empirical p-values,
 matched-null summaries, residual anomaly scores, and artifact-risk flags.
+
+## Classical Controls And Residuals
+
+DarkDNA-Observer removes classical explanations in two separate ways.
+
+First, matched nulls compare each region against nearby or similar windows using
+available classical matching features: chromosome, GC, CpG, length/window size,
+mappability, simple-repeat content, TE overlap, and local TE/GC/CpG background.
+
+Second, residualization fits each primitive score from a dedicated classical
+covariate table and ranks what remains:
+
+```text
+observed primitive score
+  - predicted score from classical covariates
+  = residual dark-DNA anomaly
+```
+
+The committed pipeline writes this table as `classical_covariates.parquet`.
+It includes composition, repeats, TE/cCRE/enhancer/promoter/exon/intron/UTR
+overlap, blacklist/gap/segmental-duplication flags, mappability, scaffold-edge
+distance, TSS distance, window size, and local background terms. It deliberately
+does not use primitive score columns or hidden/anomaly-view columns as controls,
+because that would regress away the signal being tested.
+
+The result should be read together with `classical_explanation_fraction`,
+`matched_null_zscore`, `empirical_p_value`, and artifact flags. A high residual
+with weak matched-null support is a review target; a high residual with strong
+matched-null support is a stronger assay candidate.
 
 ## Interpretation Rules
 
@@ -278,6 +313,7 @@ Feature, score, and residual commands write:
 
 - `sequence_features.parquet`
 - `primitive_scores.parquet`
+- `classical_covariates.parquet`
 - `matched_nulls.parquet`
 - `null_model_summary.parquet`
 - `residual_scores.parquet`
@@ -290,7 +326,9 @@ Reporting writes:
 - `region_cards.json`
 - `region_cards.tsv`
 - `darkdna_report.html`
-- residual diagnostic plots
+- `multipanel_summary.svg`
+- `residual_score_histogram.svg`
+- `observed_vs_predicted_classical_score.svg`
 - genome-browser BED/bedGraph tracks
 
 ## Region Cards
@@ -338,6 +376,12 @@ Optional:
 - segmental duplication BED
 - centromere/telomere BED
 
+RepeatMasker-style TE annotations are supported through the TE BED/GFF3 path.
+ENCODE-style cCRE/enhancer/promoter annotations can be used as BED covariates.
+Named quantitative ATAC/RNA/ChIP signal-track ingestion is not yet a first-class
+workflow; those tracks still need explicit config support beyond the current
+mappability/signal helper utilities.
+
 The MVP supports scaffold and contig genomes, plant and non-model genomes,
 missing gene names, missing transcript biotypes, and non-GENCODE GFF3
 attributes. It does not assume human chromosome names such as `chr1`.
@@ -350,6 +394,15 @@ attributes. It does not assume human chromosome names such as `chr1`.
   fast unit paths.
 - Larger validation notebooks or benchmark reports comparing candidate recovery
   across multiple organisms.
+- First-class quantitative ATAC/RNA/ChIP bigWig/bedGraph covariates with per-track
+  report panels.
+- Dedicated unsupervised anomaly models such as Isolation Forest, LOF, or
+  representation-learning models. The current MVP uses primitive-specific
+  score views, matched nulls, and residual models rather than a full anomaly-ML
+  stack.
+- Additional diagnostic plots: primitive-by-region heatmap, matched-null
+  calibration panel, classical-explanation fraction by primitive, feature
+  contribution/importance plots, and per-card local genome context panels.
 - A cleaner public vocabulary for dynamic follow-up views; some internal config
   keys still keep legacy names for compatibility.
 - Packaging polish: release metadata, citation file, changelog, and documented

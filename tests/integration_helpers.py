@@ -61,6 +61,7 @@ def assert_pipeline_outputs(outdir: Path) -> None:
         "dark_windows.parquet",
         "sequence_features.parquet",
         "primitive_scores.parquet",
+        "classical_covariates.parquet",
         "null_model_summary.parquet",
         "residual_scores.parquet",
         "candidate_primitives.parquet",

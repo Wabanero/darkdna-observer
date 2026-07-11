@@ -119,7 +119,7 @@ def residualize_scores(
     if reporter:
         reporter.start(f"residualizing primitives method={method}")
     for idx, primitive in enumerate(primitives, start=1):
-        cov_cols = numeric_covariates(data, primitive)
+        cov_cols = numeric_covariates(covariates, primitive)
         pred, used_method = fit_predict(data[cov_cols], data[primitive], method=method)
         obs = pd.to_numeric(data[primitive], errors="coerce").fillna(0.0).to_numpy()
         pred = np.nan_to_num(pred, nan=float(np.nanmean(obs) if len(obs) else 0.0), posinf=0.0, neginf=0.0)
@@ -133,18 +133,18 @@ def residualize_scores(
         if nulls is not None and not nulls.empty:
             subset = nulls[nulls["primitive"] == primitive]
             null_lookup = subset.set_index("region_id").to_dict(orient="index")
-        for idx, region_id in enumerate(data["region_id"].astype(str)):
+        for row_idx, region_id in enumerate(data["region_id"].astype(str)):
             null_row = null_lookup.get(region_id, {})
             rows.append(
                 {
                     "region_id": region_id,
                     "primitive": primitive,
-                    "observed_score": float(obs[idx]),
-                    "predicted_classical_score": float(pred[idx]),
-                    "residual_score": float(residual[idx]),
-                    "residual_zscore": float(residual_z[idx]),
+                    "observed_score": float(obs[row_idx]),
+                    "predicted_classical_score": float(pred[row_idx]),
+                    "residual_score": float(residual[row_idx]),
+                    "residual_zscore": float(residual_z[row_idx]),
                     "matched_null_zscore": float(null_row.get("null_zscore", np.nan)),
-                    "empirical_p_value": float(null_row.get("empirical_p_value", empirical_p_value(obs[idx], obs, higher=True))),
+                    "empirical_p_value": float(null_row.get("empirical_p_value", empirical_p_value(obs[row_idx], obs, higher=True))),
                     "classical_explanation_fraction": r2,
                     "covariates_used": ",".join(cov_cols),
                     "model_method": used_method,

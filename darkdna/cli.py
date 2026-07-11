@@ -17,6 +17,7 @@ from darkdna.primitives.labeler import assign_primitive_labels, write_primitive_
 from darkdna.reports.genome_browser_tracks import make_tracks as write_tracks
 from darkdna.reports.html_report import generate_html_report
 from darkdna.reports.region_cards import make_region_cards, write_region_cards
+from darkdna.residuals.classical_covariates import prepare_classical_covariates, write_classical_covariates
 from darkdna.residuals.null_models import build_matched_null_models, write_matched_nulls
 from darkdna.residuals.residual_model import residualize_scores, write_residual_outputs
 from darkdna.toy_data import make_toy_data
@@ -159,9 +160,12 @@ def run_config_pipeline(
 
     stage += 1
     progress_message("pipeline", f"stage {stage}/{len(PIPELINE_STAGE_NAMES)} {PIPELINE_STAGE_NAMES[stage - 1]}")
-    residuals_df, residual_summary = residualize_scores(scores_df, features_df, nulls_df, method=residual_method, progress=True)
+    classical_covariates_df = prepare_classical_covariates(windows_df, features_df)
+    classical_covariates_path = write_classical_covariates(classical_covariates_df, outdir)
+    progress_message("residualize", f"classical_covariates={len(classical_covariates_df)} rows")
+    residuals_df, residual_summary = residualize_scores(scores_df, classical_covariates_df, nulls_df, method=residual_method, progress=True)
     residual_paths = write_residual_outputs(residuals_df, residual_summary, outdir)
-    write_provenance(outdir, "darkdna run: residualize", cfg, [score_path, feature_path, null_path])
+    write_provenance(outdir, "darkdna run: residualize", cfg, [score_path, classical_covariates_path, null_path])
     logger.info("Wrote residual scores to %s", residual_paths["residuals"])
     pipeline.update(stage, message=f"residual_rows={len(residuals_df)}", force=True)
 
@@ -353,7 +357,7 @@ def build_null_models_cmd(
 @app.command()
 def residualize(
     scores: Optional[Path] = typer.Option(None, help="Primitive score table."),
-    covariates: Optional[Path] = typer.Option(None, help="Classical covariate/feature table."),
+    covariates: Optional[Path] = typer.Option(None, help="Classical covariate table."),
     nulls: Optional[Path] = typer.Option(None, help="Matched null summary table."),
     outdir: Optional[Path] = typer.Option(None, help="Output directory."),
     method: str = typer.Option("linear", help="linear, robust_linear, random_forest, gradient_boosting, xgboost, or lightgbm."),
@@ -362,10 +366,19 @@ def residualize(
     cfg = load_config(config)
     outdir = cfg_outdir(config, cfg, outdir)
     scores = scores or outdir / "primitive_scores.parquet"
-    covariates = covariates or outdir / "sequence_features.parquet"
     nulls = nulls or outdir / "matched_nulls.parquet"
     score_table = read_table(scores)
-    covariate_table = read_table(covariates)
+    if covariates is None:
+        covariates = outdir / "classical_covariates.parquet"
+        if not covariates.exists():
+            windows_path = outdir / "dark_windows.parquet"
+            features_path = outdir / "sequence_features.parquet"
+            covariate_table = prepare_classical_covariates(read_table(windows_path), read_table(features_path))
+            write_classical_covariates(covariate_table, outdir)
+        else:
+            covariate_table = read_table(covariates)
+    else:
+        covariate_table = read_table(covariates)
     null_table = read_table(nulls) if nulls else pd.DataFrame()
     residuals, summary = residualize_scores(score_table, covariate_table, null_table, method=method, progress=True)
     paths = write_residual_outputs(residuals, summary, outdir)
