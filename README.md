@@ -327,6 +327,7 @@ Reporting writes:
 - `region_cards.tsv`
 - `darkdna_report.html`
 - `multipanel_summary.svg`
+- `classical_control_multipanel.svg`
 - `residual_score_histogram.svg`
 - `observed_vs_predicted_classical_score.svg`
 - genome-browser BED/bedGraph tracks

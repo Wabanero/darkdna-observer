@@ -24,7 +24,7 @@ REPORT_TEMPLATE = """<!doctype html>
     th { background: #e7efea; text-align: left; }
     .caveat { padding: 12px; background: #fff5d9; border-left: 4px solid #c6912f; }
     .card { border: 1px solid #d7ded8; border-radius: 6px; padding: 12px; margin: 12px 0; background: white; }
-    img { max-width: 540px; display: block; margin: 12px 0; }
+    img { max-width: 100%; height: auto; display: block; margin: 12px 0 20px; }
   </style>
 </head>
 <body>

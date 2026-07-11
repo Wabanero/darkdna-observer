@@ -24,3 +24,4 @@ def test_html_report_generation(tmp_path):
     assert "hypothesis-generating" in html
     assert "Prompt" not in html
     assert (tmp_path / "multipanel_summary.svg").exists()
+    assert (tmp_path / "classical_control_multipanel.svg").exists()

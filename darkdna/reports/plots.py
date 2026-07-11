@@ -246,6 +246,176 @@ def _write_multipanel_summary(
     path.write_text(_svg_frame(width, height, title, "\n".join(parts)), encoding="utf-8")
 
 
+def _write_classical_control_multipanel(
+    residuals: pd.DataFrame,
+    labels: pd.DataFrame | None,
+    path: Path,
+    title: str = "Classical Explanation Removal Multipanel",
+) -> None:
+    width, height = 1120, 780
+    margin = 32
+    gap = 28
+    panel_w = (width - (2 * margin) - gap) / 2
+    panel_h = (height - 92 - gap) / 2
+    panels = [
+        (margin, 70, "Classical explanation fraction"),
+        (margin + panel_w + gap, 70, "Observed vs predicted classical score"),
+        (margin, 70 + panel_h + gap, "Residual vs matched-null evidence"),
+        (margin + panel_w + gap, 70 + panel_h + gap, "Top post-control candidates"),
+    ]
+    parts = [
+        f'<text x="{margin}" y="34" font-family="Arial" font-size="22" fill="#223c3b">{escape(title)}</text>',
+        f'<text x="{margin}" y="56" font-family="Arial" font-size="12" fill="#555">How much primitive signal is predicted by classical covariates, and what remains after subtraction.</text>',
+    ]
+    for x, y, panel_title in panels:
+        parts.extend(
+            [
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{panel_w:.1f}" height="{panel_h:.1f}" fill="white" stroke="#d7ded8" rx="4"/>',
+                f'<text x="{x + 14:.1f}" y="{y + 24:.1f}" font-family="Arial" font-size="14" fill="#223c3b">{escape(panel_title)}</text>',
+            ]
+        )
+
+    labels = labels if labels is not None else pd.DataFrame()
+
+    # Panel 1: R2-like classical explanation fraction by primitive.
+    x0, y0, _ = panels[0]
+    if residuals.empty or not {"primitive", "classical_explanation_fraction"}.issubset(residuals.columns):
+        parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No classical explanation fractions available.</text>')
+    else:
+        explained = residuals[["primitive", "classical_explanation_fraction"]].drop_duplicates("primitive").copy()
+        explained["classical_explanation_fraction"] = pd.to_numeric(explained["classical_explanation_fraction"], errors="coerce").fillna(0.0)
+        explained = explained.sort_values("classical_explanation_fraction", ascending=False).head(8)
+        bar_left = x0 + 210
+        bar_top = y0 + 46
+        row_h = max(22, (panel_h - 74) / max(1, len(explained)))
+        max_bar_w = panel_w - 255
+        for idx, row in enumerate(explained.itertuples(index=False)):
+            y = bar_top + idx * row_h
+            value = float(getattr(row, "classical_explanation_fraction"))
+            label = escape(_primitive_label(getattr(row, "primitive"))[:28])
+            bar_w = max(0.0, min(1.0, value)) * max_bar_w
+            color = "#9b5f3f" if value >= 0.7 else "#426b69"
+            parts.append(f'<text x="{x0 + 18:.1f}" y="{y + 14:.1f}" font-family="Arial" font-size="11" fill="#333">{label}</text>')
+            parts.append(f'<rect x="{bar_left:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="14" fill="{color}"/>')
+            parts.append(f'<text x="{bar_left + bar_w + 6:.1f}" y="{y + 12:.1f}" font-family="Arial" font-size="11" fill="#333">{value:.2f}</text>')
+
+    # Panel 2: observed primitive scores against classical predictions.
+    x0, y0, _ = panels[1]
+    needed = {"observed_score", "predicted_classical_score"}
+    if residuals.empty or not needed.issubset(residuals.columns):
+        parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No observed/predicted score pairs available.</text>')
+    else:
+        x_values = pd.to_numeric(residuals["predicted_classical_score"], errors="coerce").to_numpy(dtype=float)
+        y_values = pd.to_numeric(residuals["observed_score"], errors="coerce").to_numpy(dtype=float)
+        mask = np.isfinite(x_values) & np.isfinite(y_values)
+        x_values = x_values[mask]
+        y_values = y_values[mask]
+        plot_left = x0 + 60
+        plot_top = y0 + 48
+        plot_w = panel_w - 88
+        plot_h = panel_h - 90
+        if x_values.size == 0:
+            parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No finite observed/predicted values.</text>')
+        else:
+            xmin, xmax = float(np.min(x_values)), float(np.max(x_values))
+            ymin, ymax = float(np.min(y_values)), float(np.max(y_values))
+            if xmin == xmax:
+                xmin -= 1.0
+                xmax += 1.0
+            if ymin == ymax:
+                ymin -= 1.0
+                ymax += 1.0
+            diag_min = max(xmin, ymin)
+            diag_max = min(xmax, ymax)
+            parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top + plot_h:.1f}" x2="{plot_left + plot_w:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#65736f"/>')
+            parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top:.1f}" x2="{plot_left:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#65736f"/>')
+            if diag_min < diag_max:
+                x1 = _scale(diag_min, xmin, xmax, plot_left, plot_left + plot_w)
+                y1 = _scale(diag_min, ymin, ymax, plot_top + plot_h, plot_top)
+                x2 = _scale(diag_max, xmin, xmax, plot_left, plot_left + plot_w)
+                y2 = _scale(diag_max, ymin, ymax, plot_top + plot_h, plot_top)
+                parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#c6912f" stroke-dasharray="4 4"/>')
+            stride = max(1, int(np.ceil(x_values.size / 450)))
+            for x_val, y_val in zip(x_values[::stride], y_values[::stride]):
+                x = _scale(float(x_val), xmin, xmax, plot_left, plot_left + plot_w)
+                y = _scale(float(y_val), ymin, ymax, plot_top + plot_h, plot_top)
+                parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.6" fill="#7b4b73" opacity="0.55"/>')
+            parts.append(f'<text x="{plot_left:.1f}" y="{y0 + panel_h - 14:.1f}" font-family="Arial" font-size="11" fill="#555">predicted by classical covariates</text>')
+            parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + 12:.1f}" font-family="Arial" font-size="11" fill="#555">observed</text>')
+
+    # Panel 3: residual z-score versus matched-null z-score.
+    x0, y0, _ = panels[2]
+    needed = {"residual_zscore", "matched_null_zscore"}
+    if residuals.empty or not needed.issubset(residuals.columns):
+        parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No matched-null evidence available.</text>')
+    else:
+        x_values = pd.to_numeric(residuals["residual_zscore"], errors="coerce").to_numpy(dtype=float)
+        y_values = pd.to_numeric(residuals["matched_null_zscore"], errors="coerce").to_numpy(dtype=float)
+        mask = np.isfinite(x_values) & np.isfinite(y_values)
+        x_values = x_values[mask]
+        y_values = y_values[mask]
+        plot_left = x0 + 60
+        plot_top = y0 + 48
+        plot_w = panel_w - 88
+        plot_h = panel_h - 92
+        if x_values.size == 0:
+            parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No finite residual/null z-score pairs.</text>')
+        else:
+            zmax = max(2.5, float(np.nanmax(np.abs(np.r_[x_values, y_values]))))
+            parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top + plot_h / 2:.1f}" x2="{plot_left + plot_w:.1f}" y2="{plot_top + plot_h / 2:.1f}" stroke="#c8d1cc"/>')
+            parts.append(f'<line x1="{plot_left + plot_w / 2:.1f}" y1="{plot_top:.1f}" x2="{plot_left + plot_w / 2:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#c8d1cc"/>')
+            for threshold in (-2.0, 2.0):
+                x = _scale(threshold, -zmax, zmax, plot_left, plot_left + plot_w)
+                y = _scale(threshold, -zmax, zmax, plot_top + plot_h, plot_top)
+                parts.append(f'<line x1="{x:.1f}" y1="{plot_top:.1f}" x2="{x:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#c6912f" stroke-dasharray="3 4" opacity="0.65"/>')
+                parts.append(f'<line x1="{plot_left:.1f}" y1="{y:.1f}" x2="{plot_left + plot_w:.1f}" y2="{y:.1f}" stroke="#c6912f" stroke-dasharray="3 4" opacity="0.65"/>')
+            parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top + plot_h:.1f}" x2="{plot_left + plot_w:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#65736f"/>')
+            parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top:.1f}" x2="{plot_left:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#65736f"/>')
+            stride = max(1, int(np.ceil(x_values.size / 450)))
+            for x_val, y_val in zip(x_values[::stride], y_values[::stride]):
+                x = _scale(float(x_val), -zmax, zmax, plot_left, plot_left + plot_w)
+                y = _scale(float(y_val), -zmax, zmax, plot_top + plot_h, plot_top)
+                strong = x_val >= 2.0 and y_val >= 2.0
+                color = "#7b4b73" if strong else "#426b69"
+                parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{3.8 if strong else 2.6}" fill="{color}" opacity="0.62"/>')
+            parts.append(f'<text x="{plot_left:.1f}" y="{y0 + panel_h - 14:.1f}" font-family="Arial" font-size="11" fill="#555">residual z-score after classical controls</text>')
+            parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + 12:.1f}" font-family="Arial" font-size="11" fill="#555">null z</text>')
+
+    # Panel 4: strongest post-control candidate rows.
+    x0, y0, _ = panels[3]
+    if residuals.empty or not {"region_id", "primitive", "residual_zscore"}.issubset(residuals.columns):
+        parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No residual candidate rows available.</text>')
+    else:
+        top = residuals.copy()
+        top["residual_zscore"] = pd.to_numeric(top["residual_zscore"], errors="coerce")
+        if "matched_null_zscore" in top.columns:
+            top["matched_null_zscore"] = pd.to_numeric(top["matched_null_zscore"], errors="coerce").fillna(0.0)
+        else:
+            top["matched_null_zscore"] = 0.0
+        top["support_score"] = top["residual_zscore"].clip(lower=0.0) + 0.5 * top["matched_null_zscore"].clip(lower=0.0)
+        top = top.dropna(subset=["residual_zscore"]).sort_values("support_score", ascending=False).head(8)
+        if not labels.empty and {"region_id", "primitive_class"}.issubset(labels.columns):
+            top = top.merge(labels[["region_id", "primitive_class"]].drop_duplicates("region_id"), on="region_id", how="left")
+        max_score = max(1e-9, float(top["support_score"].max())) if not top.empty else 1.0
+        bar_left = x0 + 218
+        bar_top = y0 + 46
+        row_h = max(22, (panel_h - 74) / max(1, len(top)))
+        max_bar_w = panel_w - 265
+        for idx, row in enumerate(top.itertuples(index=False)):
+            y = bar_top + idx * row_h
+            primitive = getattr(row, "primitive_class", None) or getattr(row, "primitive")
+            label = escape(_primitive_label(primitive)[:28])
+            score = float(getattr(row, "support_score"))
+            rz = float(getattr(row, "residual_zscore"))
+            nz = float(getattr(row, "matched_null_zscore"))
+            bar_w = (score / max_score) * max_bar_w
+            parts.append(f'<text x="{x0 + 18:.1f}" y="{y + 14:.1f}" font-family="Arial" font-size="11" fill="#333">{label}</text>')
+            parts.append(f'<rect x="{bar_left:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="14" fill="#7b4b73"/>')
+            parts.append(f'<text x="{bar_left + bar_w + 6:.1f}" y="{y + 12:.1f}" font-family="Arial" font-size="11" fill="#333">z {rz:.1f} / n {nz:.1f}</text>')
+
+    path.write_text(_svg_frame(width, height, title, "\n".join(parts)), encoding="utf-8")
+
+
 def write_basic_plots(
     residuals: pd.DataFrame,
     outdir: str | Path,
@@ -259,6 +429,10 @@ def write_basic_plots(
     multipanel_path = out / "multipanel_summary.svg"
     _write_multipanel_summary(residuals, labels, windows, multipanel_path)
     paths["multipanel_summary"] = multipanel_path
+
+    classical_path = out / "classical_control_multipanel.svg"
+    _write_classical_control_multipanel(residuals, labels, classical_path)
+    paths["classical_control_multipanel"] = classical_path
 
     hist_path = out / "residual_score_histogram.svg"
     _write_histogram(_finite(residuals.get("residual_zscore", pd.Series(dtype=float))), hist_path, "Residual Score Histogram")
