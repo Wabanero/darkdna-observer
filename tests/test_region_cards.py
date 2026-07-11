@@ -36,6 +36,9 @@ def test_region_card_contains_assay_blueprint_fields():
     assert cards[0]["recommended_primitive_assay"] == "Negative-Space Rescue/Scramble Assay"
     assert cards[0]["observed_feature_evidence"]["supporting_features"] == ["depleted_kmer_score"]
     assert cards[0]["primitive_hypothesis"]["candidate_label"] == "negative_space_element_candidate"
+    assert cards[0]["mechanistic_bridge"]["bridge_status"] == "hypothesized_bridge_requires_validation"
+    assert cards[0]["mechanistic_bridge"]["direct_primitive_validation_allowed"] is False
+    assert "exploratory_only" in cards[0]["assay_validation_scope"]
     assert "not observed molecular properties" in cards[0]["feature_hypothesis_boundary"]
     assert "Dark is an operational project term" in cards[0]["terminology_scope"]["dark_operational_use"]
     assert cards[0]["assembly_pangenome_context"]["current_scope"] == "reference_based_window"
@@ -76,9 +79,12 @@ def test_region_card_uses_primitive_specific_key_tests():
     )
     cards = make_region_cards(windows, labels, residuals)
     tests_by_primitive = {card["primitive_class"]: card["key_interaction_test"] for card in cards}
+    bridge_by_primitive = {card["primitive_class"]: card["mechanistic_bridge"] for card in cards}
     assert tests_by_primitive["fractal_scaffold_candidate"].startswith("folding_scale_effect")
     assert tests_by_primitive["quantum_susceptible_domain_candidate"].startswith("physical_susceptibility_effect")
     assert len(set(tests_by_primitive.values())) == 2
+    assert "polymer physics or coarse-grained DNA simulations" in bridge_by_primitive["fractal_scaffold_candidate"]["candidate_intermediate_processes"]
+    assert "test GC-, dinucleotide-, and k-mer-preserved controls" in bridge_by_primitive["fractal_scaffold_candidate"]["required_bridge_evidence"]
 
 
 def test_no_call_and_unexplained_do_not_use_generic_key_test():
@@ -173,3 +179,49 @@ def test_region_cards_keep_observed_features_separate_from_hypothesis():
     assert hypothesis["candidate_label"] == "sequence_regime_boundary_candidate"
     assert hypothesis["hypothesis_statement"] != observed["supporting_features"][0]
     assert card["candidate_only"] is True
+
+
+def test_resonant_candidate_requires_intermediate_mechanistic_bridge():
+    windows = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "chrom": ["scaffold_A"],
+            "start": [10],
+            "end": [210],
+            "window_size": [200],
+            "parent_region_id": [None],
+            "child_region_ids": [""],
+            "artifact_risk_flags": [""],
+        }
+    )
+    labels = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "primitive_class": ["resonant_pulse_decoder_candidate"],
+            "primitive_confidence": [0.8],
+            "top_supporting_features": ["phase_periodicity_around_10bp"],
+        }
+    )
+    residuals = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "primitive": ["resonant_pulse_decoder_candidate_score"],
+            "observed_score": [2.0],
+            "residual_zscore": [3.0],
+            "matched_null_zscore": [2.5],
+            "empirical_p_value": [0.01],
+            "classical_explanation_fraction": [0.2],
+            "covariates_used": ["gc_content"],
+        }
+    )
+
+    card = make_region_cards(windows, labels, residuals)[0]
+    bridge = card["mechanistic_bridge"]
+
+    assert "10 bp/147 bp periodicity" in bridge["measured_feature"]
+    assert "frequency- or pulse-specific response" == bridge["proposed_dynamic_phenotype"]
+    assert "nucleosome phasing" in bridge["candidate_intermediate_processes"]
+    assert "TF cooperative binding at phased spacing" in bridge["candidate_intermediate_processes"]
+    assert "show periodicity affects an intermediate molecular process" in bridge["required_bridge_evidence"]
+    assert bridge["direct_primitive_validation_allowed"] is False
+    assert "exploratory_only" in card["assay_validation_scope"]

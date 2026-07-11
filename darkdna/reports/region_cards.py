@@ -146,6 +146,7 @@ def build_region_card(
         "recommended_assay": assay.get("assay"),
         "forbidden_interpretation": ontology.forbidden_interpretation,
     }
+    mechanistic_bridge = assay.get("mechanistic_bridge", {})
     card = {
         "region_id": region_id,
         "coordinates": f"{window.get('chrom')}:{int(window.get('start'))}-{int(window.get('end'))}",
@@ -165,6 +166,8 @@ def build_region_card(
         "prompt1_allowed_interpretation": ontology.prompt1_interpretation,
         "observed_feature_evidence": observed_feature_evidence,
         "primitive_hypothesis": primitive_hypothesis,
+        "mechanistic_bridge": mechanistic_bridge,
+        "assay_validation_scope": mechanistic_bridge.get("assay_scope_if_bridge_missing", ""),
         "feature_hypothesis_boundary": (
             "Observed features are measured sequence/statistical evidence; "
             "primitive labels are assay-generating hypotheses, not observed molecular properties."
@@ -193,8 +196,11 @@ def build_region_card(
         "forbidden_interpretation": ontology.forbidden_interpretation,
         "assay_feasibility": "MVP estimate: medium; refine with organism, cell type, and available assays.",
         "assay_cost_complexity": "MVP estimate: moderate to high depending on readout.",
-        "recommended_next_step": "Inspect matched-null diagnostics, artifact flags, and design native/control perturbation assay.",
-        "interpretation_caveat": "This card is an assay-generating hypothesis, not a functional annotation.",
+        "recommended_next_step": "Inspect matched-null diagnostics, artifact flags, mechanistic bridge evidence, and native/control perturbation design.",
+        "interpretation_caveat": (
+            "This card is an assay-generating hypothesis, not a functional annotation. "
+            "If the mechanistic bridge is unvalidated, the assay is exploratory rather than direct primitive validation."
+        ),
     }
     if assay.get("temporal_interaction_test"):
         card["temporal_interaction_test"] = assay["temporal_interaction_test"]
@@ -245,6 +251,8 @@ def write_region_cards(cards: list[dict], outdir: str | Path) -> dict[str, Path]
                 "artifact_risk_flags": c["artifact_risk_flags"],
                 "feature_hypothesis_boundary": c["feature_hypothesis_boundary"],
                 "assembly_pangenome_caveat": c["assembly_pangenome_context"]["caveat"],
+                "mechanistic_bridge_status": c["mechanistic_bridge"].get("bridge_status", ""),
+                "assay_validation_scope": c["assay_validation_scope"],
                 "recommended_primitive_assay": c["recommended_primitive_assay"],
             }
             for c in cards

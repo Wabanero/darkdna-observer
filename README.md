@@ -463,6 +463,8 @@ contains:
 - residual and matched-null evidence
 - artifact-risk flags
 - controlled covariates
+- mechanistic bridge: the physical or molecular process that would connect the
+  measured sequence feature to the proposed phenotype
 - required validation data
 - recommended primitive-specific assay
 - recommended classical validation assay
@@ -486,6 +488,34 @@ susceptibility for `quantum_susceptible_domain_candidate`, fork pausing for
 
 Temporal or memory-like candidates require sequence-by-treatment-by-time/history
 validation before any dynamic interpretation.
+
+## Mechanistic Bridge Requirement
+
+Primitive assays are not allowed to jump directly from a computational sequence
+feature to a dynamic phenotype. Each region card contains a mandatory
+`mechanistic_bridge` field with:
+
+- the measured sequence feature
+- the proposed dynamic or molecular phenotype
+- candidate intermediate processes
+- bridge-specific validation evidence
+- a status flag explaining whether direct primitive validation is allowed
+
+For example, a `fractal_scaffold_candidate` does not automatically imply a
+folding phenotype. The bridge must pass through evidence such as polymer
+simulations, DNA shape models, nucleosome occupancy predictions, in vitro
+nucleosome assembly, single-molecule force measurements, and length-matched plus
+k-mer-preserved controls.
+
+Likewise, a `resonant_pulse_decoder_candidate` does not follow automatically
+from periodic sequence. The bridge must identify an intermediate mechanism such
+as nucleosome phasing, TF cooperative binding, mechanosensitivity, replication
+dynamics, or chromatin looping before a temporal pulse assay can be interpreted
+as primitive validation.
+
+If the bridge is unvalidated or missing, the assay remains exploratory. It can
+generate bridge evidence, but it should not be reported as direct validation of
+the proposed primitive.
 
 ## Supported Inputs
 

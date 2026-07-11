@@ -94,6 +94,10 @@ REPORT_TEMPLATE = """<!doctype html>
       {% if card.assembly_pangenome_context %}
       <p><strong>Assembly context:</strong> {{ card.assembly_pangenome_context.caveat }}</p>
       {% endif %}
+      {% if card.mechanistic_bridge %}
+      <p><strong>Mechanistic bridge:</strong> {{ card.mechanistic_bridge.measured_feature }} &rarr; {{ card.mechanistic_bridge.proposed_dynamic_phenotype }}</p>
+      <p><strong>Bridge status:</strong> {{ card.mechanistic_bridge.bridge_status }}. {{ card.mechanistic_bridge.assay_scope_if_bridge_missing }}</p>
+      {% endif %}
       <p><strong>Coordinates:</strong> {{ card.coordinates }}; <strong>Confidence:</strong> {{ "%.3f"|format(card.primitive_confidence) }}</p>
       <p><strong>Assay:</strong> {{ card.recommended_primitive_assay }}</p>
       <p><strong>Key test:</strong> {{ card.key_interaction_test }}</p>

@@ -110,6 +110,8 @@ def assert_pipeline_outputs(outdir: Path) -> None:
     assert all(card.get("forbidden_interpretation") for card in cards)
     assert all(card.get("observed_feature_evidence") for card in cards)
     assert all(card.get("primitive_hypothesis") for card in cards)
+    assert all(card.get("mechanistic_bridge") for card in cards)
+    assert all("assay_scope_if_bridge_missing" in card.get("mechanistic_bridge", {}) for card in cards)
     assert all(card.get("feature_hypothesis_boundary") for card in cards)
     assert all(card.get("terminology_scope") for card in cards)
     assert all(card.get("assembly_pangenome_context") for card in cards)

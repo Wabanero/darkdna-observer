@@ -11,6 +11,253 @@ KEY_INTERACTION = "effect = (Native_treatment - Native_control) - (ControlSequen
 TEMPORAL_INTERACTION = "Include sequence x treatment x time/history interaction."
 
 
+def _bridge(
+    measured_feature: str,
+    proposed_dynamic_phenotype: str,
+    candidate_processes: list[str],
+    bridge_validation_steps: list[str],
+    *,
+    status: str = "hypothesized_bridge_requires_validation",
+) -> dict:
+    return {
+        "measured_feature": measured_feature,
+        "proposed_dynamic_phenotype": proposed_dynamic_phenotype,
+        "candidate_intermediate_processes": candidate_processes,
+        "required_bridge_evidence": bridge_validation_steps,
+        "bridge_status": status,
+        "assay_scope_if_bridge_missing": (
+            "exploratory_only; this assay can generate bridge evidence but is not direct validation "
+            "of the proposed primitive phenotype until the intermediate physical or molecular process is shown."
+        ),
+        "direct_primitive_validation_allowed": False,
+    }
+
+
+MECHANISTIC_BRIDGES: dict[str, dict] = {
+    "fractal_scaffold_candidate": _bridge(
+        "fractal_score, scale_persistence_score, compression anomaly, or numeric-walk texture",
+        "folding, compaction, or multiscale scaffold behavior",
+        [
+            "polymer physics or coarse-grained DNA simulations",
+            "DNA shape or bendability models",
+            "nucleosome occupancy or phasing predictions",
+            "in vitro nucleosome assembly",
+            "single-molecule force or extension response",
+        ],
+        [
+            "show that the sequence-derived scale feature changes predicted polymer or shape behavior",
+            "test length-matched controls",
+            "test GC-, dinucleotide-, and k-mer-preserved controls",
+            "test scale-shuffled controls before claiming a folding mechanism",
+        ],
+    ),
+    "constraint_grammar_region_candidate": _bridge(
+        "motif spacing, grammar entropy, transition surprise, or forbidden-word depletion",
+        "grammar-dependent structural, binding, or context-response behavior",
+        [
+            "TF or nucleosome occupancy grammar",
+            "DNA shape grammar",
+            "protein cooperative binding",
+            "local chromatin accessibility grammar",
+        ],
+        [
+            "separate motif content from spacing/order effects",
+            "use motif-preserved spacing-randomized controls",
+            "use spacing-preserved motif-mutated controls",
+            "show a molecular readout changes before interpreting any dynamic phenotype",
+        ],
+    ),
+    "quantum_susceptible_domain_candidate": _bridge(
+        "G-richness, G4/non-B-DNA propensity, oxidation-prone context, or charge-transfer proxy",
+        "physical susceptibility under oxidation, ionic, thermal, or structural perturbation",
+        [
+            "G4 or non-B-DNA folding",
+            "oxidative lesion formation",
+            "sequence-dependent electronic or nanopore dwell-time proxy",
+            "methylation or chromatin-state modulation of physical susceptibility",
+        ],
+        [
+            "validate G4/non-B structure or oxidation sensitivity directly",
+            "compare G-tract disrupted and GC-matched controls",
+            "avoid claims of actual quantum effects from sequence proxies",
+        ],
+    ),
+    "replication_instability_candidate": _bridge(
+        "repeat, palindrome, skew, non-B propensity, or fork-texture proxy",
+        "fork pausing, replication stress, origin firing, or timing instability",
+        [
+            "polymerase fork pausing at repeats/non-B structures",
+            "R-loop or secondary-structure formation",
+            "replication timing context",
+            "repair or checkpoint sensitivity",
+        ],
+        [
+            "measure fork speed, pausing, timing, or stress response",
+            "test repeat-disrupted and palindrome-broken controls",
+            "separate sequence instability from mappability or assembly artifacts",
+        ],
+    ),
+    "chromatin_motion_oscillator_candidate": _bridge(
+        "spacing periodicity, bendability proxy, entropy asymmetry, or phase-like sequence texture",
+        "locus motion, confinement, or pulse-sensitive spatial dynamics",
+        [
+            "nucleosome phasing",
+            "DNA stiffness or bendability",
+            "loop extrusion or tethering context",
+            "mechanosensitive chromatin response",
+        ],
+        [
+            "predict or measure nucleosome phasing/shape first",
+            "compare phase-scrambled insertions",
+            "show live-locus motion changes after bridge-level sequence perturbation",
+        ],
+    ),
+    "decoherence_boundary_candidate": _bridge(
+        "entropy cliff, regime boundary, compression boundary, or local feature void",
+        "noise barrier or variance-propagation boundary",
+        [
+            "nucleosome occupancy transition",
+            "TF/cofactor occupancy discontinuity",
+            "chromatin accessibility boundary",
+            "reporter coupling or insulation geometry",
+        ],
+        [
+            "measure a molecular boundary before interpreting noise insulation",
+            "use boundary-smoothed and neutral-spacer controls",
+            "show variance/covariance effects are sequence-dependent and not reporter-position artifacts",
+        ],
+    ),
+    "hysteresis_candidate": _bridge(
+        "asymmetry, nested repeats, non-B propensity, or recurrent-kmer orientation",
+        "history-dependent response or recovery memory",
+        [
+            "secondary-structure metastability",
+            "chromatin-state persistence",
+            "replication or repair history dependence",
+            "transcription-factor cooperative state retention",
+        ],
+        [
+            "show a sequence-dependent molecular state can persist through recovery",
+            "include first-pulse vs second-pulse comparisons",
+            "use repeat-disrupted and palindrome-broken controls",
+        ],
+    ),
+    "resonant_pulse_decoder_candidate": _bridge(
+        "10 bp/147 bp periodicity, spacing Fourier power, autocorrelation, or phase grammar",
+        "frequency- or pulse-specific response",
+        [
+            "nucleosome phasing",
+            "TF cooperative binding at phased spacing",
+            "mechanosensitivity",
+            "replication dynamics",
+            "chromatin looping or enhancer-promoter contact timing",
+        ],
+        [
+            "show periodicity affects an intermediate molecular process",
+            "compare phase-scrambled and periodicity-disrupted controls",
+            "use equal-total-dose pulse controls before claiming pulse decoding",
+        ],
+    ),
+    "possibility_gate_candidate": _bridge(
+        "boundary-condition score, negative-space boundary, or forbidden-word depletion",
+        "future-state probability, reachable-state bias, or transition gating",
+        [
+            "chromatin accessibility gating",
+            "TF cooperative occupancy",
+            "3D contact permissiveness",
+            "noise/variance modulation before state transition",
+        ],
+        [
+            "show sequence affects an intermediate chromatin or binding state",
+            "measure baseline and weak-stimulus state probabilities",
+            "avoid state-bias claims without perturbation and pseudotime/fate evidence",
+        ],
+    ),
+    "criticality_tuner_candidate": _bridge(
+        "entropy/compression boundary, sequence-regime transition, or threshold-like texture",
+        "dose threshold, transition slope, or recovery-rate change",
+        [
+            "chromatin accessibility threshold",
+            "cooperative TF binding",
+            "nucleosome barrier strength",
+            "stress-response or replication-response threshold",
+        ],
+        [
+            "measure dose-response or pulse-duration curves",
+            "test phase-disrupted/deletion controls",
+            "demonstrate an intermediate molecular threshold before claiming criticality",
+        ],
+    ),
+    "negative_space_element_candidate": _bridge(
+        "depleted k-mers, motif desert, repeat/CpG/G-tract desert, or structured absence",
+        "absence-dependent chromatin, binding, noise, or accessibility behavior",
+        [
+            "avoidance of nucleosome-disfavoring words",
+            "absence of TF-binding or repeat-associated tokens",
+            "DNA shape produced by missing motifs",
+            "local chromatin accessibility or silence from structured absence",
+        ],
+        [
+            "insert depleted/forbidden tokens and test rescue/disruption",
+            "use GC-, length-, and k-mer-preserved controls",
+            "show the absence itself changes a molecular readout before dynamic interpretation",
+        ],
+    ),
+    "sequence_regime_boundary_candidate": _bridge(
+        "left/right sequence-regime difference, entropy boundary, GC/CpG/repeat shift, or compression change",
+        "boundary behavior, insulation proxy, or local readout discontinuity",
+        [
+            "nucleosome-position boundary",
+            "DNA shape discontinuity",
+            "TF/cofactor occupancy transition",
+            "chromatin accessibility boundary",
+        ],
+        [
+            "smooth or shuffle the boundary while preserving flanking content",
+            "measure a molecular boundary before claiming regulatory boundary behavior",
+            "include left-half/right-half and neutral-spacer controls",
+        ],
+    ),
+    "TE_grammar_node_candidate": _bridge(
+        "TE mosaic, TE boundary score, TE orientation entropy, or TE overlap grammar",
+        "TE-order-dependent chromatin, binding, accessibility, or stress-response behavior",
+        [
+            "TE-derived TF binding",
+            "TE boundary nucleosome positioning",
+            "orientation/order-dependent repeat grammar",
+            "stress-responsive TE chromatin context",
+        ],
+        [
+            "separate simple TE overlap from TE order/orientation effects",
+            "use TE-order scrambled and family-matched random TE controls",
+            "show a molecular readout changes before TE exaptation claims",
+        ],
+    ),
+    "unexplained_dark_anomaly_candidate": _bridge(
+        "high residual sequence anomaly without a dominant primitive-specific feature",
+        "unknown sequence-dependent behavior",
+        [
+            "unknown; requires feature audit",
+            "matched-null review",
+            "artifact, assembly, and mappability review",
+        ],
+        [
+            "identify the measured feature class driving the anomaly",
+            "build matched controls before wet-lab interpretation",
+            "treat assays as exploratory until a bridge is specified",
+        ],
+        status="bridge_missing_feature_audit_required",
+    ),
+    "no_call": _bridge(
+        "no candidate feature crossed threshold",
+        "none",
+        ["not applicable"],
+        ["do not prioritize wet-lab validation until candidate thresholds are met"],
+        status="not_applicable_no_candidate",
+    ),
+}
+
+
 ASSAY_BLUEPRINTS: dict[str, dict] = {
     "fractal_scaffold_candidate": {
         "assay": "Fractal Folding Assay",
@@ -148,6 +395,7 @@ def recommend_assay(primitive: str) -> dict:
         blueprint["required_validation_data"] = "review_only"
         blueprint["prompt1_allowed_interpretation"] = "No sequence-derived primitive candidate was assigned."
         blueprint["suggested_prompt2_view"] = "none"
+        blueprint["mechanistic_bridge"] = deepcopy(MECHANISTIC_BRIDGES["no_call"])
         blueprint.setdefault("allowed_interpretation", "No assay should be prioritized from this card unless future evidence crosses candidate thresholds.")
         blueprint.setdefault("forbidden_interpretation", "Do not interpret no_call regions as primitive candidates.")
         return blueprint
@@ -160,6 +408,7 @@ def recommend_assay(primitive: str) -> dict:
     blueprint["required_validation_data"] = ontology.required_input_level
     blueprint["prompt1_allowed_interpretation"] = ontology.prompt1_interpretation
     blueprint["suggested_prompt2_view"] = ontology.suggested_prompt2_view
+    blueprint["mechanistic_bridge"] = deepcopy(MECHANISTIC_BRIDGES.get(candidate_name, MECHANISTIC_BRIDGES["unexplained_dark_anomaly_candidate"]))
     blueprint.setdefault("key_interaction_test", KEY_INTERACTION)
     if blueprint.get("temporal"):
         blueprint["temporal_interaction_test"] = TEMPORAL_INTERACTION
