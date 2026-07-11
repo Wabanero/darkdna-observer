@@ -351,11 +351,19 @@ contains:
 - perturbation design
 - expected positive and negative outcomes
 
-The required interaction test for assay blueprints is:
+The common design principle for assay blueprints is a difference-in-differences
+contrast:
 
 ```text
 effect = (Native_treatment - Native_control) - (ControlSequence_treatment - ControlSequence_control)
 ```
+
+The report renders a primitive-specific version of that contrast for each card:
+folding/compaction for `fractal_scaffold_candidate`, oxidation/G4 or physical
+susceptibility for `quantum_susceptible_domain_candidate`, fork pausing for
+`replication_instability_candidate`, pulse/frequency response for
+`resonant_pulse_decoder_candidate`, state-transition probability for
+`possibility_gate_candidate`, and so on.
 
 Temporal or memory-like candidates require sequence-by-treatment-by-time/history
 validation before any dynamic interpretation.
