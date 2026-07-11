@@ -14,11 +14,12 @@ def _finite(values: pd.Series) -> np.ndarray:
     return arr[np.isfinite(arr)]
 
 
-def _svg_frame(width: int, height: int, title: str, body: str) -> str:
+def _svg_frame(width: int, height: int, title: str, body: str, *, show_title: bool = True) -> str:
+    title_text = f'<text x="24" y="28" font-family="Arial" font-size="16" fill="#223c3b">{escape(title)}</text>\n' if show_title else ""
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">\n'
         '<rect width="100%" height="100%" fill="#fbfbf8"/>\n'
-        f'<text x="24" y="28" font-family="Arial" font-size="16" fill="#223c3b">{escape(title)}</text>\n'
+        f"{title_text}"
         f"{body}\n"
         "</svg>\n"
     )
@@ -102,6 +103,44 @@ def _scale(value: float, vmin: float, vmax: float, low: float, high: float) -> f
 def _primitive_label(value: object) -> str:
     text = str(value).replace("_candidate_score", "").replace("_candidate", "")
     return text.replace("_", " ")
+
+
+def _add_x_ticks(
+    parts: list[str],
+    ticks: list[float],
+    vmin: float,
+    vmax: float,
+    left: float,
+    baseline: float,
+    width: float,
+    *,
+    label_y: float | None = None,
+    suffix: str = "",
+) -> None:
+    label_y = baseline + 16 if label_y is None else label_y
+    for tick in ticks:
+        x = _scale(tick, vmin, vmax, left, left + width)
+        parts.append(f'<line x1="{x:.1f}" y1="{baseline:.1f}" x2="{x:.1f}" y2="{baseline + 4:.1f}" stroke="#65736f"/>')
+        parts.append(f'<text x="{x - 12:.1f}" y="{label_y:.1f}" font-family="Arial" font-size="10" fill="#555">{tick:g}{suffix}</text>')
+
+
+def _add_y_ticks(
+    parts: list[str],
+    ticks: list[float],
+    vmin: float,
+    vmax: float,
+    left: float,
+    top: float,
+    height: float,
+    *,
+    label_x: float | None = None,
+    suffix: str = "",
+) -> None:
+    label_x = left - 34 if label_x is None else label_x
+    for tick in ticks:
+        y = _scale(tick, vmin, vmax, top + height, top)
+        parts.append(f'<line x1="{left - 4:.1f}" y1="{y:.1f}" x2="{left:.1f}" y2="{y:.1f}" stroke="#65736f"/>')
+        parts.append(f'<text x="{label_x:.1f}" y="{y + 3:.1f}" font-family="Arial" font-size="10" fill="#555">{tick:g}{suffix}</text>')
 
 
 def _write_multipanel_summary(
@@ -243,7 +282,7 @@ def _write_multipanel_summary(
                 parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + 10:.1f}" font-family="Arial" font-size="11" fill="#555">+z</text>')
                 parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + plot_h:.1f}" font-family="Arial" font-size="11" fill="#555">-z</text>')
 
-    path.write_text(_svg_frame(width, height, title, "\n".join(parts)), encoding="utf-8")
+    path.write_text(_svg_frame(width, height, title, "\n".join(parts), show_title=False), encoding="utf-8")
 
 
 def _write_classical_control_multipanel(
@@ -266,6 +305,12 @@ def _write_classical_control_multipanel(
     parts = [
         f'<text x="{margin}" y="34" font-family="Arial" font-size="22" fill="#223c3b">{escape(title)}</text>',
         f'<text x="{margin}" y="56" font-family="Arial" font-size="12" fill="#555">How much primitive signal is predicted by classical covariates, and what remains after subtraction.</text>',
+        '<rect x="690" y="21" width="10" height="10" fill="#9b5f3f"/>',
+        '<text x="705" y="30" font-family="Arial" font-size="10" fill="#555">mostly classical</text>',
+        '<circle cx="812" cy="26" r="4" fill="#7b4b73" opacity="0.72"/>',
+        '<text x="823" y="30" font-family="Arial" font-size="10" fill="#555">strong post-control</text>',
+        '<line x1="948" y1="26" x2="964" y2="26" stroke="#c6912f" stroke-dasharray="3 4"/>',
+        '<text x="970" y="30" font-family="Arial" font-size="10" fill="#555">review threshold</text>',
     ]
     for x, y, panel_title in panels:
         parts.extend(
@@ -298,6 +343,12 @@ def _write_classical_control_multipanel(
             parts.append(f'<text x="{x0 + 18:.1f}" y="{y + 14:.1f}" font-family="Arial" font-size="11" fill="#333">{label}</text>')
             parts.append(f'<rect x="{bar_left:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="14" fill="{color}"/>')
             parts.append(f'<text x="{bar_left + bar_w + 6:.1f}" y="{y + 12:.1f}" font-family="Arial" font-size="11" fill="#333">{value:.2f}</text>')
+        axis_y = y0 + panel_h - 30
+        threshold_x = bar_left + 0.7 * max_bar_w
+        parts.append(f'<line x1="{bar_left:.1f}" y1="{axis_y:.1f}" x2="{bar_left + max_bar_w:.1f}" y2="{axis_y:.1f}" stroke="#65736f"/>')
+        _add_x_ticks(parts, [0.0, 0.5, 0.7, 1.0], 0.0, 1.0, bar_left, axis_y, max_bar_w)
+        parts.append(f'<line x1="{threshold_x:.1f}" y1="{y0 + 42:.1f}" x2="{threshold_x:.1f}" y2="{axis_y:.1f}" stroke="#c6912f" stroke-dasharray="3 4"/>')
+        parts.append(f'<text x="{threshold_x + 5:.1f}" y="{axis_y - 8:.1f}" font-family="Arial" font-size="10" fill="#8a6a1f">0.70 mostly classical</text>')
 
     # Panel 2: observed primitive scores against classical predictions.
     x0, y0, _ = panels[1]
@@ -335,13 +386,22 @@ def _write_classical_control_multipanel(
                 x2 = _scale(diag_max, xmin, xmax, plot_left, plot_left + plot_w)
                 y2 = _scale(diag_max, ymin, ymax, plot_top + plot_h, plot_top)
                 parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#c6912f" stroke-dasharray="4 4"/>')
+                parts.append(f'<text x="{x2 - 106:.1f}" y="{y2 - 6:.1f}" font-family="Arial" font-size="10" fill="#8a6a1f">y=x classical prediction</text>')
             stride = max(1, int(np.ceil(x_values.size / 450)))
             for x_val, y_val in zip(x_values[::stride], y_values[::stride]):
                 x = _scale(float(x_val), xmin, xmax, plot_left, plot_left + plot_w)
                 y = _scale(float(y_val), ymin, ymax, plot_top + plot_h, plot_top)
                 parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.6" fill="#7b4b73" opacity="0.55"/>')
-            parts.append(f'<text x="{plot_left:.1f}" y="{y0 + panel_h - 14:.1f}" font-family="Arial" font-size="11" fill="#555">predicted by classical covariates</text>')
-            parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + 12:.1f}" font-family="Arial" font-size="11" fill="#555">observed</text>')
+            x_mid = (xmin + xmax) / 2
+            y_mid = (ymin + ymax) / 2
+            _add_x_ticks(parts, [xmin, x_mid, xmax], xmin, xmax, plot_left, plot_top + plot_h, plot_w)
+            _add_y_ticks(parts, [ymin, y_mid, ymax], ymin, ymax, plot_left, plot_top, plot_h)
+            parts.append(f'<text x="{plot_left:.1f}" y="{y0 + panel_h - 14:.1f}" font-family="Arial" font-size="11" fill="#555">predicted primitive score, unitless</text>')
+            parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + 12:.1f}" font-family="Arial" font-size="11" fill="#555">observed score, unitless</text>')
+            parts.append(f'<circle cx="{x0 + panel_w - 168:.1f}" cy="{y0 + 52:.1f}" r="4" fill="#7b4b73" opacity="0.55"/>')
+            parts.append(f'<text x="{x0 + panel_w - 157:.1f}" y="{y0 + 56:.1f}" font-family="Arial" font-size="10" fill="#555">primitive score row</text>')
+            parts.append(f'<line x1="{x0 + panel_w - 172:.1f}" y1="{y0 + 68:.1f}" x2="{x0 + panel_w - 162:.1f}" y2="{y0 + 68:.1f}" stroke="#c6912f" stroke-dasharray="4 4"/>')
+            parts.append(f'<text x="{x0 + panel_w - 157:.1f}" y="{y0 + 72:.1f}" font-family="Arial" font-size="10" fill="#555">classical fit line</text>')
 
     # Panel 3: residual z-score versus matched-null z-score.
     x0, y0, _ = panels[2]
@@ -369,6 +429,10 @@ def _write_classical_control_multipanel(
                 y = _scale(threshold, -zmax, zmax, plot_top + plot_h, plot_top)
                 parts.append(f'<line x1="{x:.1f}" y1="{plot_top:.1f}" x2="{x:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#c6912f" stroke-dasharray="3 4" opacity="0.65"/>')
                 parts.append(f'<line x1="{plot_left:.1f}" y1="{y:.1f}" x2="{plot_left + plot_w:.1f}" y2="{y:.1f}" stroke="#c6912f" stroke-dasharray="3 4" opacity="0.65"/>')
+            x_threshold = _scale(2.0, -zmax, zmax, plot_left, plot_left + plot_w)
+            y_threshold = _scale(2.0, -zmax, zmax, plot_top + plot_h, plot_top)
+            parts.append(f'<text x="{x_threshold + 5:.1f}" y="{plot_top + 12:.1f}" font-family="Arial" font-size="10" fill="#8a6a1f">residual z = 2</text>')
+            parts.append(f'<text x="{plot_left + 5:.1f}" y="{y_threshold - 6:.1f}" font-family="Arial" font-size="10" fill="#8a6a1f">null z = 2</text>')
             parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top + plot_h:.1f}" x2="{plot_left + plot_w:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#65736f"/>')
             parts.append(f'<line x1="{plot_left:.1f}" y1="{plot_top:.1f}" x2="{plot_left:.1f}" y2="{plot_top + plot_h:.1f}" stroke="#65736f"/>')
             stride = max(1, int(np.ceil(x_values.size / 450)))
@@ -378,8 +442,15 @@ def _write_classical_control_multipanel(
                 strong = x_val >= 2.0 and y_val >= 2.0
                 color = "#7b4b73" if strong else "#426b69"
                 parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{3.8 if strong else 2.6}" fill="{color}" opacity="0.62"/>')
+            tick_max = round(zmax, 1)
+            _add_x_ticks(parts, [-tick_max, -2.0, 0.0, 2.0, tick_max], -zmax, zmax, plot_left, plot_top + plot_h, plot_w)
+            _add_y_ticks(parts, [-tick_max, -2.0, 0.0, 2.0, tick_max], -zmax, zmax, plot_left, plot_top, plot_h)
             parts.append(f'<text x="{plot_left:.1f}" y="{y0 + panel_h - 14:.1f}" font-family="Arial" font-size="11" fill="#555">residual z-score after classical controls</text>')
             parts.append(f'<text x="{x0 + 12:.1f}" y="{plot_top + 12:.1f}" font-family="Arial" font-size="11" fill="#555">null z</text>')
+            parts.append(f'<circle cx="{x0 + panel_w - 170:.1f}" cy="{y0 + 52:.1f}" r="4" fill="#7b4b73" opacity="0.62"/>')
+            parts.append(f'<text x="{x0 + panel_w - 158:.1f}" y="{y0 + 56:.1f}" font-family="Arial" font-size="10" fill="#555">residual and null z >= 2</text>')
+            parts.append(f'<circle cx="{x0 + panel_w - 170:.1f}" cy="{y0 + 68:.1f}" r="4" fill="#426b69" opacity="0.62"/>')
+            parts.append(f'<text x="{x0 + panel_w - 158:.1f}" y="{y0 + 72:.1f}" font-family="Arial" font-size="10" fill="#555">background/review point</text>')
 
     # Panel 4: strongest post-control candidate rows.
     x0, y0, _ = panels[3]
@@ -412,8 +483,16 @@ def _write_classical_control_multipanel(
             parts.append(f'<text x="{x0 + 18:.1f}" y="{y + 14:.1f}" font-family="Arial" font-size="11" fill="#333">{label}</text>')
             parts.append(f'<rect x="{bar_left:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="14" fill="#7b4b73"/>')
             parts.append(f'<text x="{bar_left + bar_w + 6:.1f}" y="{y + 12:.1f}" font-family="Arial" font-size="11" fill="#333">z {rz:.1f} / n {nz:.1f}</text>')
+        axis_y = y0 + panel_h - 30
+        parts.append(f'<line x1="{bar_left:.1f}" y1="{axis_y:.1f}" x2="{bar_left + max_bar_w:.1f}" y2="{axis_y:.1f}" stroke="#65736f"/>')
+        _add_x_ticks(parts, [0.0, round(max_score / 2, 1), round(max_score, 1)], 0.0, max_score, bar_left, axis_y, max_bar_w)
+        if max_score >= 3.0:
+            threshold_x = _scale(3.0, 0.0, max_score, bar_left, bar_left + max_bar_w)
+            parts.append(f'<line x1="{threshold_x:.1f}" y1="{y0 + 42:.1f}" x2="{threshold_x:.1f}" y2="{axis_y:.1f}" stroke="#c6912f" stroke-dasharray="3 4"/>')
+            parts.append(f'<text x="{threshold_x + 5:.1f}" y="{axis_y - 8:.1f}" font-family="Arial" font-size="10" fill="#8a6a1f">review guide 3</text>')
+        parts.append(f'<text x="{bar_left:.1f}" y="{y0 + panel_h - 12:.1f}" font-family="Arial" font-size="11" fill="#555">support score = residual z + 0.5 x matched-null z</text>')
 
-    path.write_text(_svg_frame(width, height, title, "\n".join(parts)), encoding="utf-8")
+    path.write_text(_svg_frame(width, height, title, "\n".join(parts), show_title=False), encoding="utf-8")
 
 
 def write_basic_plots(

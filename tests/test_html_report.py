@@ -25,3 +25,5 @@ def test_html_report_generation(tmp_path):
     assert "Prompt" not in html
     assert (tmp_path / "multipanel_summary.svg").exists()
     assert (tmp_path / "classical_control_multipanel.svg").exists()
+    assert (tmp_path / "multipanel_summary.svg").read_text(encoding="utf-8").count("Candidate Summary Multipanel") == 1
+    assert (tmp_path / "classical_control_multipanel.svg").read_text(encoding="utf-8").count("Classical Explanation Removal Multipanel") == 1
