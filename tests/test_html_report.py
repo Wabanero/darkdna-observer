@@ -10,11 +10,13 @@ def test_html_report_generation(tmp_path):
     labels = pd.DataFrame({"region_id": ["r1"], "primitive_class": ["negative_space_element_candidate"], "primitive_confidence": [0.9]})
     residuals = pd.DataFrame(
         {
-            "region_id": ["r1"],
-            "primitive": ["negative_space_element_candidate_score"],
-            "observed_score": [1.0],
-            "predicted_classical_score": [0.2],
-            "residual_zscore": [3.0],
+            "region_id": ["r1", "r2"],
+            "primitive": ["negative_space_element_candidate_score", "TE_grammar_node_candidate_score"],
+            "observed_score": [1.0, 0.0],
+            "predicted_classical_score": [0.2, 0.0],
+            "residual_score": [0.8, 0.0],
+            "residual_zscore": [3.0, 0.0],
+            "matched_null_zscore": [2.0, 0.0],
         }
     )
     cards = [{"region_id": "r1", "primitive_class": "negative_space_element_candidate", "coordinates": "scaffold_A:0-200", "primitive_confidence": 0.9, "candidate_only": True, "candidate_statement": "This is a sequence-derived candidate hypothesis, not a confirmed biological primitive.", "recommended_primitive_assay": "Negative-Space Rescue/Scramble Assay", "key_interaction_test": "effect = test", "interpretation_caveat": "hypothesis"}]
@@ -27,3 +29,5 @@ def test_html_report_generation(tmp_path):
     assert (tmp_path / "classical_control_multipanel.svg").exists()
     assert (tmp_path / "multipanel_summary.svg").read_text(encoding="utf-8").count("Candidate Summary Multipanel") == 1
     assert (tmp_path / "classical_control_multipanel.svg").read_text(encoding="utf-8").count("Classical Explanation Removal Multipanel") == 1
+    assert "No active TE-grammar candidates" in html
+    assert "TE_grammar_node_candidate_score</td>" not in html

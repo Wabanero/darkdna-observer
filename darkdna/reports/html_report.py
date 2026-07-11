@@ -85,10 +85,23 @@ REPORT_TEMPLATE = """<!doctype html>
 """
 
 
-def _table_html(df: pd.DataFrame, max_rows: int = 20) -> str:
+def _table_html(df: pd.DataFrame, max_rows: int = 20, empty_message: str = "No rows.") -> str:
     if df is None or df.empty:
-        return "<p>No rows.</p>"
+        return f"<p>{empty_message}</p>"
     return df.head(max_rows).to_html(index=False, escape=True)
+
+
+def _active_evidence_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df.copy() if df is not None else pd.DataFrame()
+    score_cols = [col for col in ["observed_score", "residual_score", "residual_zscore", "matched_null_zscore"] if col in df.columns]
+    if not score_cols:
+        return df
+    active = pd.Series(False, index=df.index)
+    for col in score_cols:
+        values = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        active = active | (values.abs() > 1e-12)
+    return df.loc[active].copy()
 
 
 def generate_html_report(
@@ -111,10 +124,10 @@ def generate_html_report(
         else pd.DataFrame()
     )
     top_candidates = labels.sort_values("primitive_confidence", ascending=False).head(20)
-    top_residuals = residuals.sort_values("residual_zscore", ascending=False).head(20)
-    negative = residuals[residuals["primitive"] == "negative_space_element_candidate_score"].sort_values("residual_zscore", ascending=False).head(20)
-    boundary = residuals[residuals["primitive"] == "sequence_regime_boundary_candidate_score"].sort_values("residual_zscore", ascending=False).head(20)
-    te = residuals[residuals["primitive"] == "TE_grammar_node_candidate_score"].sort_values("residual_zscore", ascending=False).head(20)
+    top_residuals = _active_evidence_rows(residuals).sort_values("residual_zscore", ascending=False).head(20)
+    negative = _active_evidence_rows(residuals[residuals["primitive"] == "negative_space_element_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)
+    boundary = _active_evidence_rows(residuals[residuals["primitive"] == "sequence_regime_boundary_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)
+    te = _active_evidence_rows(residuals[residuals["primitive"] == "TE_grammar_node_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)
     provenance_path = out / "run_metadata.json"
     provenance = provenance_path.read_text(encoding="utf-8") if provenance_path.exists() else "Provenance not found in report directory."
     html = Template(REPORT_TEMPLATE).render(
@@ -131,7 +144,7 @@ def generate_html_report(
         top_residuals_html=_table_html(top_residuals),
         negative_space_html=_table_html(negative),
         boundary_html=_table_html(boundary),
-        te_html=_table_html(te),
+        te_html=_table_html(te, empty_message="No active TE-grammar candidates. TE annotation may be absent, or all TE grammar scores are zero after classical controls and matched-null comparison."),
         plots=plots,
         cards=cards[:25],
     )
