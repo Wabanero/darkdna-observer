@@ -29,7 +29,7 @@ REPORT_TEMPLATE = """<!doctype html>
 </head>
 <body>
   <h1>{{ project_name }}</h1>
-  <p class="caveat">This report is hypothesis-generating. Prompt 1 labels are sequence-derived candidates, not confirmed biological primitives.</p>
+  <p class="caveat">This report is hypothesis-generating. Sequence-only labels are candidate hypotheses, not confirmed biological primitives.</p>
 
   <h2>Project Summary</h2>
   <p>Input windows: {{ window_count }}. Primitive labels: {{ primitive_count }}. Residual rows: {{ residual_count }}.</p>
@@ -102,7 +102,7 @@ def generate_html_report(
 ) -> Path:
     out = Path(outdir)
     out.mkdir(parents=True, exist_ok=True)
-    plots = write_basic_plots(residuals, out)
+    plots = write_basic_plots(residuals, out, labels=labels, windows=windows)
     window_counts = windows.groupby("window_size").size().reset_index(name="count") if "window_size" in windows.columns else pd.DataFrame()
     primitive_counts = labels.groupby("primitive_class").size().reset_index(name="count") if "primitive_class" in labels.columns else pd.DataFrame()
     artifact_summary = (

@@ -20,4 +20,7 @@ def test_html_report_generation(tmp_path):
     cards = [{"region_id": "r1", "primitive_class": "negative_space_element_candidate", "coordinates": "scaffold_A:0-200", "primitive_confidence": 0.9, "candidate_only": True, "candidate_statement": "This is a sequence-derived candidate hypothesis, not a confirmed biological primitive.", "recommended_primitive_assay": "Negative-Space Rescue/Scramble Assay", "key_interaction_test": "effect = test", "interpretation_caveat": "hypothesis"}]
     path = generate_html_report(windows, labels, residuals, cards, tmp_path)
     assert path.exists()
-    assert "hypothesis-generating" in path.read_text(encoding="utf-8")
+    html = path.read_text(encoding="utf-8")
+    assert "hypothesis-generating" in html
+    assert "Prompt" not in html
+    assert (tmp_path / "multipanel_summary.svg").exists()
