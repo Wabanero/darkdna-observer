@@ -5,6 +5,8 @@ from __future__ import annotations
 import pandas as pd
 
 
+BLOCK_CV_SIZE_BP = 100_000
+
 CLASSICAL_COVARIATES = [
     "gc_content",
     "n_fraction",
@@ -32,6 +34,15 @@ CLASSICAL_COVARIATES = [
 ]
 
 
+def _block_id(row: pd.Series, block_size: int = BLOCK_CV_SIZE_BP) -> str:
+    chrom = str(row.get("chrom", "unknown"))
+    try:
+        start = int(row.get("start", 0) or 0)
+    except Exception:
+        start = 0
+    return f"{chrom}:block_{start // block_size}"
+
+
 def build_classical_covariates(windows: pd.DataFrame, features: pd.DataFrame | None = None) -> pd.DataFrame:
     base = windows.copy()
     if features is not None and not features.empty:
@@ -44,7 +55,14 @@ def build_classical_covariates(windows: pd.DataFrame, features: pd.DataFrame | N
         base["local_GC_background"] = base.get("gc_content", base.get("gc_content_feature", 0.0))
     if "local_CpG_background" not in base.columns:
         base["local_CpG_background"] = base.get("CpG_density", 0.0)
-    cols = ["region_id", "chrom"] if "chrom" in base.columns else ["region_id"]
+    cols = ["region_id"]
+    for metadata_col in ["chrom", "start", "end"]:
+        if metadata_col in base.columns:
+            cols.append(metadata_col)
+    if "chrom" in base.columns and "start" in base.columns:
+        base["block_id"] = base.apply(_block_id, axis=1)
+        base["chromosome_cv_fold"] = base["chrom"].astype(str)
+        cols.extend(["block_id", "chromosome_cv_fold"])
     for col in CLASSICAL_COVARIATES:
         if col not in base.columns:
             base[col] = 0.0

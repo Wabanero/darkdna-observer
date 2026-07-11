@@ -5,20 +5,55 @@
 # DarkDNA-Observer
 
 DarkDNA-Observer is a sequence-first analysis toolkit for finding unusual
-dark/noncoding DNA windows. It turns a genome plus optional annotations into
-candidate regions, primitive scores, residual anomaly scores, validation cards,
-HTML reports, and genome-browser tracks.
+unannotated and noncoding genomic sequence architectures. It turns a genome plus
+optional annotations into candidate regions, observed feature evidence,
+primitive-hypothesis scores, residual anomaly scores, validation cards, HTML
+reports, and genome-browser tracks.
 
 The project is not a gene annotation pipeline and it is not a functional-claim
 engine. Its job is narrower: rank genomic windows whose intrinsic sequence
 architecture is unusual after classical covariates, matched null models, and
 artifact flags have been considered.
 
-Final mission: find dark DNA regions that may encode constraints on biological
-trajectories rather than classical molecular products. In practical terms, the
-tool asks whether a noncoding window may shape behavior, noise, timing, memory,
-folding, or future-state accessibility, then turns that possibility into a
-candidate-only region card and a validation assay.
+Scientific mission: build an interpretable system for finding noncoding
+architectures that current ontologies do not describe well, then turn those
+architectures into falsifiable experimental hypotheses. The project does not
+treat dark DNA, noncoding DNA, unannotated DNA, and junk DNA as synonyms. It is
+a conservative hypothesis generator for loci that deserve better controls,
+better context, and eventually one carefully chosen causal perturbation.
+
+## Terminology
+
+DarkDNA-Observer studies unannotated and noncoding genomic sequence
+architectures. "Dark" is used operationally and does not imply that the regions
+are functional, unassembled, or evolutionarily selected.
+
+- Noncoding DNA is DNA that does not encode proteins. It can include enhancers,
+  promoters, insulators, noncoding RNAs, replication origins, centromeres,
+  telomeres, repeats, and sequence with no known function.
+- Unannotated DNA is sequence without a reliable current annotation.
+- Genomically dark DNA can mean sequence that is hard to assemble, map, or
+  genotype, often because of repeats, segmental duplications, satellites, or
+  related reference-quality issues.
+- Junk DNA is a stronger evolutionary claim: sequence without a selected-effect
+  function. Biochemical activity such as transcription, accessibility, or
+  protein binding is not by itself evidence of selected biological function.
+
+## Scientific Scope
+
+Unannotated and noncoding genome research should ultimately combine at least
+five layers:
+
+- assembly and pangenome context
+- evolutionary constraint
+- cell-state-resolved epigenomics
+- 3D genome context
+- causal perturbation
+
+The committed MVP mainly covers a narrower but potentially original layer:
+intrinsic sequence architecture plus matched statistical controls. That scope is
+intentional. It makes the sequence-derived signal auditable before adding
+comparative, epigenomic, spatial, and perturbational evidence.
 
 ## What It Does
 
@@ -47,8 +82,9 @@ has proven function".
 
 ## Primitive Properties
 
-Primitive labels are operational classes. They group windows by the type of
-sequence evidence that dominates after residualization and matched-null review.
+Primitive labels are operational hypothesis classes. They group windows by the
+type of sequence evidence that dominates after residualization and matched-null
+review, but the labels are not themselves observed molecular properties.
 
 | Primitive candidate | Main evidence | What it means in this tool | Required follow-up |
 | --- | --- | --- | --- |
@@ -65,10 +101,25 @@ sequence evidence that dominates after residualization and matched-null review.
 | `negative_space_element_candidate` | depleted k-mers, motif deserts, repeat/CpG/G-tract deserts, local voids | Structured absence that remains anomalous after controls. | Rescue/scramble assays that reinsert or disrupt missing tokens. |
 | `sequence_regime_boundary_candidate` | left/right regime difference, entropy/GC/CpG/repeat/compression shifts | Candidate boundary between intrinsic sequence regimes. | Boundary smoothing, disruption, insulation, or accessibility assays. |
 | `TE_grammar_node_candidate` | TE overlap, TE mosaic score, TE boundary score, TE orientation entropy | TE-derived or TE-mosaic sequence architecture beyond simple overlap. | TE-order/orientation perturbation and TE-derived regulatory comparison. |
-| `unexplained_dark_anomaly_candidate` | high residual anomaly without one dominant class | A prioritized dark window that needs review before interpretation. | Matched-null review, artifact checks, and orthogonal validation. |
+| `unexplained_dark_anomaly_candidate` | high residual anomaly without one dominant class | A prioritized unannotated/noncoding window that needs review before interpretation. | Matched-null review, artifact checks, and orthogonal validation. |
 
 Every primitive score is paired with robust z-scores, empirical p-values,
 matched-null summaries, residual anomaly scores, and artifact-risk flags.
+
+## Observed Feature Evidence vs Primitive Hypothesis
+
+DarkDNA-Observer keeps two concepts separate.
+
+Observed feature evidence is what the pipeline actually measures: sequence
+composition, grammar, repeats, non-B-DNA proxies, negative-space measures,
+boundaries, residuals, matched-null z-scores, empirical p-values, and artifact
+flags.
+
+A primitive hypothesis is the conservative interpretation proposed after those
+measurements survive the available controls. Region cards therefore report both
+`observed_feature_evidence` and `primitive_hypothesis`. The former is data; the
+latter is an assay-generating claim that remains unconfirmed until an
+appropriate validation experiment is performed.
 
 ## Classical Controls And Residuals
 
@@ -79,12 +130,14 @@ available classical matching features: chromosome, GC, CpG, length/window size,
 mappability, simple-repeat content, TE overlap, and local TE/GC/CpG background.
 
 Second, residualization fits each primitive score from a dedicated classical
-covariate table and ranks what remains:
+covariate table and ranks what remains. When the input contains multiple
+chromosomes or genomic blocks, classical predictions are made out-of-chromosome
+or out-of-block to reduce train/test leakage from overlapping windows:
 
 ```text
 observed primitive score
   - predicted score from classical covariates
-  = residual dark-DNA anomaly
+  = residual sequence-architecture anomaly
 ```
 
 The committed pipeline writes this table as `classical_covariates.parquet`.
@@ -98,6 +151,66 @@ The result should be read together with `classical_explanation_fraction`,
 `matched_null_zscore`, `empirical_p_value`, and artifact flags. A high residual
 with weak matched-null support is a review target; a high residual with strong
 matched-null support is a stronger assay candidate.
+
+## Assembly And Pangenome First
+
+Before asking what a candidate does, ask whether the sequence is correctly
+represented by the reference and whether that representation is typical for the
+species, strain, accession, or population being studied.
+
+DarkDNA-Observer is currently mostly reference-based. It already propagates
+technical flags such as low mappability, assembly-gap overlap, segmental
+duplication overlap, centromeric/telomeric or proximal-repeat context,
+scaffold-edge proximity, high `N` fraction, and unplaced/unlocalized contig
+status. Those flags are warnings, not complete assembly confidence estimates.
+
+The assembly and pangenome module should add:
+
+- assembly confidence and repeat-array completeness
+- copy-number and presence/absence variation
+- strain, accession, or haplotype specificity
+- graph/pangenome coordinates
+- lift-over between assemblies
+- reference-to-reference comparisons such as C57BL/6J vs CAST/EiJ for mouse,
+  then broader strain/accession panels
+
+Without this layer, a high anomaly score may indicate a badly represented,
+collapsed, difficult-to-map, or reference-specific region rather than a
+biological sequence architecture.
+
+## Overlapping Windows And Locus-Level Evidence
+
+Multiscale windows are intentionally overlapping. A 1 kb window with a 0.5 step,
+or a 1 kb window nested inside a 5 kb window, is useful for signal discovery but
+is not an independent statistical observation. Raw window counts can therefore
+inflate candidate totals, duplicate the same locus, leak nearby features between
+train/test splits, and make scale persistence look stronger than it really is.
+
+DarkDNA-Observer separates discovery windows from countable evidence:
+
+- `candidate_primitives.parquet` remains a window-level diagnostic table.
+- `candidate_loci.parquet`, `candidate_loci.tsv`, and `candidate_loci.bed`
+  merge overlapping candidate windows by chromosome and primitive class.
+- `locus_empirical_p_value` is computed at locus level from the best empirical
+  p-value, corrected by the number of supporting scales rather than by the raw
+  half-step window count.
+- `global_bh_q_value` and `primitive_bh_q_value` apply Benjamini-Hochberg FDR
+  correction across merged loci globally and within each primitive family.
+- `block_id` and `chromosome_cv_fold` mark genomic blocks that should be used
+  for block bootstrap or chromosome/block cross-validation. The residualizer
+  uses leave-one-chromosome-out prediction when multiple chromosomes are
+  present, otherwise leave-one-block-out prediction when multiple genomic
+  blocks are available. Do not random-split overlapping window rows.
+- `candidate_loci_block_bootstrap.tsv` summarizes primitive-level support by
+  resampling genomic blocks, not individual windows. Small single-block fixtures
+  are marked as insufficient independent blocks.
+- `scale_discovery_window_size`, `scale_validation_window_sizes`, and
+  `scale_validation_status` separate the strongest discovery scale from other
+  overlapping scales that support the same merged locus.
+
+Interpretation rule: use window-level rows to inspect where a signal came from,
+but use locus-level rows for candidate counts, ranking, FDR, genome-browser
+review, and follow-up prioritization.
 
 ## Interpretation Rules
 
@@ -114,6 +227,7 @@ It can say:
 It cannot say:
 
 - the region has confirmed biological function
+- biochemical activity proves selected-effect function
 - a static sequence proves memory, oscillation, threshold behavior, state bias,
   or any other dynamic mechanism
 - a physical-susceptibility proxy proves actual quantum effects
@@ -292,12 +406,12 @@ subsets, and records checksums.
 - `darkdna init`: write example configuration files.
 - `darkdna run`: execute the complete config-driven pipeline with visible console progress.
 - `darkdna make-toy-data`: create deterministic synthetic test data.
-- `darkdna make-windows`: generate multiscale dark/noncoding genomic windows.
+- `darkdna make-windows`: generate multiscale unannotated/noncoding genomic windows.
 - `darkdna extract-sequence-features`: compute intrinsic sequence and annotation-derived features.
 - `darkdna score-primitives`: combine features into candidate primitive scores.
 - `darkdna build-null-models`: build matched null summaries.
 - `darkdna residualize`: estimate residual anomaly after classical covariate controls.
-- `darkdna infer-primitives`: assign candidate labels from residual and matched-null evidence.
+- `darkdna infer-primitives`: assign candidate labels and merged locus-level candidates from residual and matched-null evidence.
 - `darkdna make-region-cards`: create JSON/TSV candidate cards and assay blueprints.
 - `darkdna report`: generate an HTML report and diagnostic plots.
 - `darkdna make-tracks`: generate BED/bedGraph files for genome browsers.
@@ -320,6 +434,11 @@ Feature, score, and residual commands write:
 - `residualization_summary.json`
 - `primitive_labels.parquet`
 - `candidate_primitives.parquet`
+- `candidate_loci.parquet`
+- `candidate_loci.tsv`
+- `candidate_loci.bed`
+- `candidate_loci_block_bootstrap.parquet`
+- `candidate_loci_block_bootstrap.tsv`
 
 Reporting writes:
 
@@ -391,31 +510,50 @@ Named quantitative ATAC/RNA/ChIP signal-track ingestion is not yet a first-class
 workflow; those tracks still need explicit config support beyond the current
 mappability/signal helper utilities.
 
+Graph/pangenome coordinates, explicit copy-number tracks, presence/absence
+variation, lift-over chains, and assembly-confidence tables are not yet
+first-class inputs. Until they are, candidate interpretation should remain
+reference-scoped and assembly-caveated.
+
 The MVP supports scaffold and contig genomes, plant and non-model genomes,
 missing gene names, missing transcript biotypes, and non-GENCODE GFF3
 attributes. It does not assume human chromosome names such as `chr1`.
 
-## What Is Still Missing
+## Scientific Roadmap
 
-- Better public real-data fixtures with curated TE, mappability, blacklist, gap,
-  and centromere/telomere tracks for each organism.
-- Continuous-integration jobs that run the real-fixture pipelines, not only the
-  fast unit paths.
-- Larger validation notebooks or benchmark reports comparing candidate recovery
-  across multiple organisms.
-- First-class quantitative ATAC/RNA/ChIP bigWig/bedGraph covariates with per-track
-  report panels.
-- Dedicated unsupervised anomaly models such as Isolation Forest, LOF, or
-  representation-learning models. The current MVP uses primitive-specific
-  score views, matched nulls, and residual models rather than a full anomaly-ML
-  stack.
-- Additional diagnostic plots: primitive-by-region heatmap, matched-null
-  calibration panel, classical-explanation fraction by primitive, feature
-  contribution/importance plots, and per-card local genome context panels.
-- A cleaner public vocabulary for dynamic follow-up views; some internal config
-  keys still keep legacy names for compatibility.
-- Packaging polish: release metadata, citation file, changelog, and documented
-  optional dependency groups per workflow.
+The next build order is:
+
+1. Add an evolutionary and pangenome module: assembly confidence,
+   repeat-array completeness, copy-number and presence/absence variation,
+   strain/accession specificity, graph or pangenome coordinates, lift-over
+   between assemblies, cross-species constraint, syntenic context, and
+   allele-frequency or variation context where data are available.
+2. Add a mouse real-data benchmark with curated FASTA, gene annotation,
+   RepeatMasker/TE annotation, mappability, blacklist, gap, and centromere or
+   telomere tracks.
+3. Strengthen surrogate null models beyond the current matched controls,
+   including sequence shuffles that preserve selected low-order properties,
+   local block structure, and annotation context.
+4. Add held-out and locus-level statistical calibration: per-locus splits,
+   out-of-sample calibration curves, larger-genome chromosome/block
+   cross-validation benchmarks, false-discovery diagnostics, and matched-null
+   calibration panels.
+5. Add foundation-model baselines so primitive scores can be compared against
+   embeddings or likelihoods from established DNA language models rather than
+   only against hand-built sequence views.
+6. Make quantitative tracks first-class inputs: ATAC/RNA/ChIP/CUT&Tag,
+   conservation, replication timing, recombination, methylation, and other
+   bigWig/bedGraph signals with per-track summaries and report panels.
+7. Choose one causal validation path and make it excellent: a single
+   perturbation/readout pairing with native, scrambled, and matched-control
+   sequences is stronger than many loose validation sketches.
+8. Continue enforcing the boundary between observed features and primitive
+   hypotheses in code, reports, cards, docs, and downstream benchmarks.
+
+Other engineering work remains useful: CI jobs for real-fixture pipelines,
+benchmark notebooks across organisms, richer diagnostic plots, release metadata,
+a citation file, a changelog, and documented optional dependency groups per
+workflow.
 
 ## Development
 

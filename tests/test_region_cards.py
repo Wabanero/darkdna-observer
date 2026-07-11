@@ -34,6 +34,11 @@ def test_region_card_contains_assay_blueprint_fields():
     assert cards[0]["candidate_only"] is True
     assert cards[0]["forbidden_interpretation"]
     assert cards[0]["recommended_primitive_assay"] == "Negative-Space Rescue/Scramble Assay"
+    assert cards[0]["observed_feature_evidence"]["supporting_features"] == ["depleted_kmer_score"]
+    assert cards[0]["primitive_hypothesis"]["candidate_label"] == "negative_space_element_candidate"
+    assert "not observed molecular properties" in cards[0]["feature_hypothesis_boundary"]
+    assert "Dark is an operational project term" in cards[0]["terminology_scope"]["dark_operational_use"]
+    assert cards[0]["assembly_pangenome_context"]["current_scope"] == "reference_based_window"
 
 
 def test_region_card_uses_primitive_specific_key_tests():
@@ -114,3 +119,57 @@ def test_no_call_and_unexplained_do_not_use_generic_key_test():
     assert tests_by_primitive["no_call"].startswith("no_call_review")
     assert tests_by_primitive["unexplained_dark_anomaly_candidate"].startswith("dark_anomaly_effect")
     assert "Native_treatment" not in " ".join(tests_by_primitive.values())
+
+
+def test_region_cards_keep_observed_features_separate_from_hypothesis():
+    windows = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "chrom": ["scaffold_A"],
+            "start": [10],
+            "end": [210],
+            "window_size": [200],
+            "parent_region_id": [None],
+            "child_region_ids": [""],
+            "artifact_risk_flags": ["low_mappability"],
+            "mappability": [0.2],
+            "n_fraction": [0.01],
+            "low_complexity_mask_fraction": [0.1],
+            "scaffold_edge_distance": [5000],
+            "overlaps_assembly_gap": [False],
+            "overlaps_segmental_duplication": [True],
+        }
+    )
+    labels = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "primitive_class": ["sequence_regime_boundary_candidate"],
+            "primitive_confidence": [0.7],
+            "top_supporting_features": ["entropy_boundary_score;gc_left_right_delta"],
+        }
+    )
+    residuals = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "primitive": ["sequence_regime_boundary_candidate_score"],
+            "observed_score": [1.8],
+            "residual_zscore": [2.7],
+            "matched_null_zscore": [2.3],
+            "empirical_p_value": [0.02],
+            "classical_explanation_fraction": [0.25],
+            "covariates_used": ["gc_content;mappability"],
+        }
+    )
+
+    card = make_region_cards(windows, labels, residuals)[0]
+
+    observed = card["observed_feature_evidence"]
+    hypothesis = card["primitive_hypothesis"]
+    assert observed["supporting_features"] == ["entropy_boundary_score", "gc_left_right_delta"]
+    assert observed["artifact_risk_flags"] == "low_mappability"
+    assert card["assembly_pangenome_context"]["available_reference_context"]["mappability"] == 0.2
+    assert card["assembly_pangenome_context"]["available_reference_context"]["overlaps_segmental_duplication"] is True
+    assert "presence_absence_variation" in card["assembly_pangenome_context"]["missing_first_class_inputs"]
+    assert hypothesis["candidate_label"] == "sequence_regime_boundary_candidate"
+    assert hypothesis["hypothesis_statement"] != observed["supporting_features"][0]
+    assert card["candidate_only"] is True

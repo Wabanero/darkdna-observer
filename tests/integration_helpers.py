@@ -65,6 +65,10 @@ def assert_pipeline_outputs(outdir: Path) -> None:
         "null_model_summary.parquet",
         "residual_scores.parquet",
         "candidate_primitives.parquet",
+        "candidate_loci.parquet",
+        "candidate_loci.tsv",
+        "candidate_loci.bed",
+        "candidate_loci_block_bootstrap.tsv",
         "region_cards.json",
         "darkdna_report.html",
         "all_residual_scores.bedGraph",
@@ -75,6 +79,7 @@ def assert_pipeline_outputs(outdir: Path) -> None:
 
     windows = pd.read_parquet(outdir / "dark_windows.parquet")
     labels = pd.read_parquet(outdir / "candidate_primitives.parquet")
+    loci = pd.read_parquet(outdir / "candidate_loci.parquet")
     residuals = pd.read_parquet(outdir / "residual_scores.parquet")
     nulls = pd.read_parquet(outdir / "null_model_summary.parquet")
     cards = json.loads((outdir / "region_cards.json").read_text(encoding="utf-8"))
@@ -88,11 +93,25 @@ def assert_pipeline_outputs(outdir: Path) -> None:
     assert "matched_null_zscore" in residuals.columns
     assert {"null_model_id", "region_id", "null_zscore"}.issubset(nulls.columns)
     assert "primitive_class" in labels.columns
+    assert {
+        "locus_id",
+        "primitive_class",
+        "n_windows",
+        "locus_empirical_p_value",
+        "global_bh_q_value",
+        "block_id",
+        "scale_validation_status",
+    }.issubset(loci.columns)
     assert CONFIRMED_FORBIDDEN_LABELS.isdisjoint(set(labels["primitive_class"].dropna()))
     for label in labels["primitive_class"].dropna().unique():
         assert label == "no_call" or label.endswith("_candidate")
     assert cards
     assert all(card.get("candidate_only") is True for card in cards)
     assert all(card.get("forbidden_interpretation") for card in cards)
+    assert all(card.get("observed_feature_evidence") for card in cards)
+    assert all(card.get("primitive_hypothesis") for card in cards)
+    assert all(card.get("feature_hypothesis_boundary") for card in cards)
+    assert all(card.get("terminology_scope") for card in cards)
+    assert all(card.get("assembly_pangenome_context") for card in cards)
     assert all(card.get("required_validation_data") for card in cards)
     assert all(card.get("suggested_prompt2_view") for card in cards)

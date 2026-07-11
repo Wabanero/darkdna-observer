@@ -1,4 +1,4 @@
-"""Dark/noncoding window generation."""
+"""Unannotated/noncoding window generation."""
 
 from __future__ import annotations
 

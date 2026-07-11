@@ -45,3 +45,31 @@ def test_prepare_classical_covariates_excludes_anomaly_features():
     assert {"gc_content", "simple_repeat_fraction", "mappability", "window_size"}.issubset(covariates.columns)
     assert "fractal_score" not in covariates.columns
     assert "hysteresis_candidate_score" not in covariates.columns
+
+
+def test_residualization_uses_blocked_cv_groups_without_covariate_leakage():
+    scores = pd.DataFrame(
+        {
+            "region_id": [f"r{i}" for i in range(6)],
+            "fractal_scaffold_candidate_score": [1.0, 1.2, 2.0, 2.2, 3.0, 3.2],
+        }
+    )
+    covariates = pd.DataFrame(
+        {
+            "region_id": [f"r{i}" for i in range(6)],
+            "block_id": ["b1", "b1", "b2", "b2", "b3", "b3"],
+            "gc_content": [0.40, 0.42, 0.50, 0.52, 0.60, 0.62],
+            "start": [0, 500, 100000, 100500, 200000, 200500],
+            "end": [1000, 1500, 101000, 101500, 201000, 201500],
+        }
+    )
+
+    residuals, summary = residualize_scores(scores, covariates, method="linear")
+
+    assert {"cv_strategy", "cv_group_col", "cv_group_id"}.issubset(residuals.columns)
+    assert set(residuals["cv_group_col"]) == {"block_id"}
+    fractal_summary = summary[summary["primitive"] == "fractal_scaffold_candidate_score"].iloc[0]
+    assert fractal_summary["cv_strategy"] == "leave_one_block_id_out"
+    assert "block_id" not in fractal_summary["covariates_used"]
+    assert "start" not in fractal_summary["covariates_used"]
+    assert "end" not in fractal_summary["covariates_used"]

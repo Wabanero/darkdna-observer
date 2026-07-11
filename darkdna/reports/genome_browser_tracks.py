@@ -8,6 +8,7 @@ import pandas as pd
 
 from darkdna.io.bed import write_bed, write_bedgraph
 from darkdna.utils.progress import ProgressReporter, progress_message
+from .locus_candidates import write_candidate_locus_outputs
 
 
 PRIMITIVE_TRACKS = {
@@ -50,6 +51,9 @@ def make_tracks(
     label_coords["name"] = label_coords["primitive_class"] + "|" + label_coords["region_id"].astype(str)
     write_bed(label_coords, primitive_bed, columns=["chrom", "start", "end", "name"])
     paths["primitive_labels"] = primitive_bed
+
+    locus_paths = write_candidate_locus_outputs(windows, labels, residuals, out)
+    paths["candidate_loci"] = locus_paths["candidate_loci_bed"]
 
     reporter = ProgressReporter("make-tracks", total=len(PRIMITIVE_TRACKS)) if progress else None
     if reporter:

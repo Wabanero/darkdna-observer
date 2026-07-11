@@ -16,6 +16,7 @@ from darkdna.io.gff import read_te_annotation
 from darkdna.primitives.labeler import assign_primitive_labels, write_primitive_labels
 from darkdna.reports.genome_browser_tracks import make_tracks as write_tracks
 from darkdna.reports.html_report import generate_html_report
+from darkdna.reports.locus_candidates import write_candidate_locus_outputs
 from darkdna.reports.region_cards import make_region_cards, write_region_cards
 from darkdna.residuals.classical_covariates import prepare_classical_covariates, write_classical_covariates
 from darkdna.residuals.null_models import build_matched_null_models, write_matched_nulls
@@ -30,7 +31,7 @@ from darkdna.views.primitive_scores import score_primitives, write_primitive_sco
 from darkdna.windows.make_windows import make_dark_windows, write_windows
 
 
-app = typer.Typer(help="DarkDNA-Observer sequence-first dark/noncoding DNA hypothesis generator.")
+app = typer.Typer(help="DarkDNA-Observer sequence-first unannotated/noncoding DNA hypothesis generator.")
 logger = get_logger()
 
 
@@ -180,8 +181,10 @@ def run_config_pipeline(
         progress=True,
     )
     label_path = write_primitive_labels(labels_df, outdir)
+    locus_paths = write_candidate_locus_outputs(windows_df, labels_df, residuals_df, outdir)
     write_provenance(outdir, "darkdna run: infer-primitives", cfg, [residual_paths["residuals"], feature_path, window_paths["parquet"]])
     logger.info("Wrote primitive labels to %s", label_path)
+    logger.info("Wrote locus-level candidate aggregation to %s", locus_paths["candidate_loci_parquet"])
     pipeline.update(stage, message=f"labels={len(labels_df)}", force=True)
 
     stage += 1
@@ -413,8 +416,10 @@ def infer_primitives_cmd(
         progress=True,
     )
     path = write_primitive_labels(labels, outdir)
+    locus_paths = write_candidate_locus_outputs(window_table, labels, residual_table, outdir)
     write_provenance(outdir, "darkdna infer-primitives", cfg, [residuals, features, windows])
     logger.info("Wrote primitive labels to %s", path)
+    logger.info("Wrote locus-level candidate aggregation to %s", locus_paths["candidate_loci_parquet"])
 
 
 @app.command("make-region-cards")

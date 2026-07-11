@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 from jinja2 import Template
 
+from .locus_candidates import block_bootstrap_locus_summary, merge_candidate_loci
 from .plots import write_basic_plots
 
 
@@ -51,7 +52,14 @@ REPORT_TEMPLATE = """<!doctype html>
   <h2>Artifact-Risk Summary</h2>
   {{ artifact_summary_html }}
 
-  <h2>Top Candidate Regions</h2>
+  <h2>Locus-Level Candidate Evidence</h2>
+  <p class="caveat">Overlapping multiscale windows are dependent observations. Candidate counts should be read from merged loci, not from raw window rows.</p>
+  {{ locus_candidates_html }}
+
+  <h2>Block Bootstrap Summary</h2>
+  {{ block_bootstrap_html }}
+
+  <h2>Top Candidate Windows</h2>
   {{ top_candidates_html }}
 
   <h2>Top Residual Anomalies</h2>
@@ -74,6 +82,18 @@ REPORT_TEMPLATE = """<!doctype html>
     <div class="card">
       <h3>{{ card.region_id }} - {{ card.primitive_class }}</h3>
       <p><strong>Candidate-only:</strong> {{ card.candidate_only }}. {{ card.candidate_statement }}</p>
+      {% if card.observed_feature_evidence %}
+      <p><strong>Observed feature evidence:</strong> {{ card.observed_feature_evidence.supporting_features|join(", ") or "No dominant supporting feature recorded" }}</p>
+      {% endif %}
+      {% if card.primitive_hypothesis %}
+      <p><strong>Primitive hypothesis:</strong> {{ card.primitive_hypothesis.hypothesis_statement }}</p>
+      {% endif %}
+      {% if card.terminology_scope %}
+      <p><strong>Terminology:</strong> {{ card.terminology_scope.dark_operational_use }}</p>
+      {% endif %}
+      {% if card.assembly_pangenome_context %}
+      <p><strong>Assembly context:</strong> {{ card.assembly_pangenome_context.caveat }}</p>
+      {% endif %}
       <p><strong>Coordinates:</strong> {{ card.coordinates }}; <strong>Confidence:</strong> {{ "%.3f"|format(card.primitive_confidence) }}</p>
       <p><strong>Assay:</strong> {{ card.recommended_primitive_assay }}</p>
       <p><strong>Key test:</strong> {{ card.key_interaction_test }}</p>
@@ -104,6 +124,26 @@ def _active_evidence_rows(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[active].copy()
 
 
+def _report_locus_columns(loci: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "locus_id",
+        "primitive_class",
+        "chrom",
+        "start",
+        "end",
+        "n_windows",
+        "window_sizes",
+        "scale_validation_status",
+        "representative_region_id",
+        "support_score",
+        "locus_empirical_p_value",
+        "global_bh_q_value",
+        "primitive_bh_q_value",
+        "block_id",
+    ]
+    return loci[[col for col in columns if col in loci.columns]].copy()
+
+
 def generate_html_report(
     windows: pd.DataFrame,
     labels: pd.DataFrame,
@@ -123,6 +163,8 @@ def generate_html_report(
         if "artifact_risk_flags" in windows.columns
         else pd.DataFrame()
     )
+    loci = merge_candidate_loci(windows, labels, residuals)
+    block_bootstrap = block_bootstrap_locus_summary(loci)
     top_candidates = labels.sort_values("primitive_confidence", ascending=False).head(20)
     top_residuals = _active_evidence_rows(residuals).sort_values("residual_zscore", ascending=False).head(20)
     negative = _active_evidence_rows(residuals[residuals["primitive"] == "negative_space_element_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)
@@ -140,6 +182,14 @@ def generate_html_report(
         window_counts_html=_table_html(window_counts),
         primitive_counts_html=_table_html(primitive_counts),
         artifact_summary_html=_table_html(artifact_summary),
+        locus_candidates_html=_table_html(
+            _report_locus_columns(loci),
+            empty_message="No merged candidate loci passed the candidate filters.",
+        ),
+        block_bootstrap_html=_table_html(
+            block_bootstrap,
+            empty_message="No candidate loci available for block bootstrap summary.",
+        ),
         top_candidates_html=_table_html(top_candidates),
         top_residuals_html=_table_html(top_residuals),
         negative_space_html=_table_html(negative),
