@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import pandas as pd
 
@@ -23,6 +24,13 @@ PRIMITIVE_TRACKS = {
     "sequence_regime_boundary_candidate": "sequence_regime_boundary_candidates.bed",
     "TE_grammar_node_candidate": "TE_grammar_node_candidates.bed",
 }
+
+
+def _primitive_track_filename(primitive: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_]+", "_", str(primitive)).strip("_")
+    if stem.endswith("_candidate"):
+        stem = stem[: -len("_candidate")] + "_candidates"
+    return f"{stem or 'primitive_candidates'}.bed"
 
 
 def make_tracks(
@@ -55,10 +63,21 @@ def make_tracks(
     locus_paths = write_candidate_locus_outputs(windows, labels, residuals, out)
     paths["candidate_loci"] = locus_paths["candidate_loci_bed"]
 
-    reporter = ProgressReporter("make-tracks", total=len(PRIMITIVE_TRACKS)) if progress else None
+    observed_primitives = []
+    if "primitive_class" in label_coords.columns:
+        observed_primitives = [
+            primitive
+            for primitive in sorted(label_coords["primitive_class"].dropna().astype(str).unique())
+            if primitive and primitive != "no_call"
+        ]
+    primitive_tracks = dict(PRIMITIVE_TRACKS)
+    for primitive in observed_primitives:
+        primitive_tracks.setdefault(primitive, _primitive_track_filename(primitive))
+
+    reporter = ProgressReporter("make-tracks", total=len(primitive_tracks)) if progress else None
     if reporter:
         reporter.start("writing primitive BED tracks")
-    for idx, (primitive, filename) in enumerate(PRIMITIVE_TRACKS.items(), start=1):
+    for idx, (primitive, filename) in enumerate(primitive_tracks.items(), start=1):
         subset = label_coords[label_coords["primitive_class"] == primitive].copy()
         path = out / filename
         if subset.empty:

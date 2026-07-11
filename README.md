@@ -561,6 +561,34 @@ susceptibility for `non_B_DNA_physical_susceptibility_candidate`, fork pausing f
 Temporal or memory-like candidates require sequence-by-treatment-by-time/history
 validation before any dynamic interpretation.
 
+### Example Card Visuals
+
+Each HTML card now includes a compact visual panel. The upper half answers
+"where is this candidate in the genome?": a chromosome-scale marker, a local
+view around the focal window, merged candidate loci, and every non-`no_call`
+primitive class overlapping that neighborhood. The lower half answers "what
+could this candidate mean?": it sketches the measured sequence proxy, the
+candidate primitive hypothesis, and the assay readout that would be needed to
+test the bridge.
+
+![Example decoherence-boundary candidate card](assets/readme/region-card-decoherence-boundary.png)
+
+In this example, a `decoherence_boundary_candidate` is not a claim of physical
+decoherence. It means the sequence window has boundary-like evidence such as an
+entropy cliff, regime transition, compression boundary, or local feature void.
+The generated hypothesis is that this region may behave like a noise or
+variance-propagation boundary, which would need a noise-propagation or
+single-cell variance assay before any dynamic interpretation is allowed.
+
+![Example possibility-gate candidate card](assets/readme/region-card-possibility-gate.png)
+
+In this example, a `possibility_gate_candidate` means the local sequence has
+boundary-condition, negative-space, or forbidden-word-depletion evidence near
+other primitive-labeled windows. The sketch proposes a state-transition or
+reachable-state gating hypothesis, not a confirmed regulatory role. It becomes
+meaningful only if a follow-up assay can show that the native sequence changes
+state-transition behavior relative to matched controls.
+
 ## Mechanistic Bridge Requirement
 
 Primitive assays are not allowed to jump directly from a computational sequence

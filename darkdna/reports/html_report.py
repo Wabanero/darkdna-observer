@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 from jinja2 import Template
 
+from .card_visuals import augment_cards_with_visuals
 from .locus_candidates import block_bootstrap_locus_summary, merge_candidate_loci
 from .plots import write_basic_plots
 
@@ -25,6 +26,11 @@ REPORT_TEMPLATE = """<!doctype html>
     th { background: #e7efea; text-align: left; }
     .caveat { padding: 12px; background: #fff5d9; border-left: 4px solid #c6912f; }
     .card { border: 1px solid #d7ded8; border-radius: 6px; padding: 12px; margin: 12px 0; background: white; }
+    .card h3 a { color: #223c3b; text-decoration: none; }
+    .card h3 a:hover { text-decoration: underline; }
+    .card-links { font-size: 13px; margin-top: -4px; }
+    .card-links a { color: #315f8f; margin-right: 14px; }
+    .card-visual svg { max-width: 100%; height: auto; display: block; margin: 8px 0 16px; }
     img { max-width: 100%; height: auto; display: block; margin: 12px 0 20px; }
   </style>
 </head>
@@ -80,7 +86,13 @@ REPORT_TEMPLATE = """<!doctype html>
   <h2>Top Region Cards</h2>
   {% for card in cards %}
     <div class="card">
-      <h3>{{ card.region_id }} - {{ card.primitive_class }}</h3>
+      <h3>{% if card.card_href %}<a href="{{ card.card_href }}">{{ card.region_id }} - {{ card.primitive_class }}</a>{% else %}{{ card.region_id }} - {{ card.primitive_class }}{% endif %}</h3>
+      {% if card.card_href %}
+      <p class="card-links"><a href="{{ card.card_href }}">Standalone card</a><a href="{{ card.card_region_bed_href }}">BED</a><a href="{{ card.card_primitive_intervals_bed_href }}">Visible primitives BED</a></p>
+      {% endif %}
+      {% if card.card_visual_html %}
+      <div class="card-visual">{{ card.card_visual_html }}</div>
+      {% endif %}
       <p><strong>Candidate-only:</strong> {{ card.candidate_only }}. {{ card.candidate_statement }}</p>
       {% if card.observed_feature_evidence %}
       <p><strong>Observed feature evidence:</strong> {{ card.observed_feature_evidence.supporting_features|join(", ") or "No dominant supporting feature recorded" }}</p>
@@ -185,6 +197,7 @@ def generate_html_report(
     te = _active_evidence_rows(residuals[residuals["primitive"] == "TE_grammar_node_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)
     provenance_path = out / "run_metadata.json"
     provenance = provenance_path.read_text(encoding="utf-8") if provenance_path.exists() else "Provenance not found in report directory."
+    report_cards = augment_cards_with_visuals(cards[:25], windows, labels, residuals, loci, out)
     html = Template(REPORT_TEMPLATE).render(
         project_name=project_name,
         input_summary=input_summary or {},
@@ -209,7 +222,7 @@ def generate_html_report(
         boundary_html=_table_html(boundary),
         te_html=_table_html(te, empty_message="No active TE-grammar candidates. TE annotation may be absent, or all TE grammar scores are zero after classical controls and matched-null comparison."),
         plots=plots,
-        cards=cards[:25],
+        cards=report_cards,
     )
     path = out / "darkdna_report.html"
     path.write_text(html, encoding="utf-8")

@@ -56,7 +56,15 @@ def test_html_report_generation(tmp_path):
     assert "Terminology" in html
     assert "Score methodology" in html
     assert "Null model panel" in html
+    assert "Hypothesized primitive behavior" in html
+    assert "Standalone card" in html
     assert "Prompt" not in html
+    card_dir = tmp_path / "cards" / "r1_negative_space_element_candidate"
+    assert (card_dir / "index.html").exists()
+    assert (card_dir / "region.bed").exists()
+    assert (card_dir / "view_window.bed").exists()
+    assert (card_dir / "primitive_intervals.bed").exists()
+    assert "negative_space_element_candidate|r1" in (card_dir / "region.bed").read_text(encoding="utf-8")
     assert (tmp_path / "multipanel_summary.svg").exists()
     assert (tmp_path / "classical_control_multipanel.svg").exists()
     assert (tmp_path / "multipanel_summary.svg").read_text(encoding="utf-8").count("Candidate Summary Multipanel") == 1
