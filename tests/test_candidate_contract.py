@@ -1,7 +1,7 @@
 import pandas as pd
 
 from darkdna.primitives.ontology import get_primitive, primitive_names
-from darkdna.views.primitive_scores import score_primitives
+from darkdna.views.primitive_scores import primitive_score_manifest, score_primitives
 
 
 def test_prompt1_outputs_candidate_labels_not_confirmed_dynamic_labels():
@@ -33,6 +33,20 @@ def test_sequence_only_scores_do_not_produce_prompt2_dynamic_scores():
     assert forbidden.isdisjoint(scores.columns)
     assert "possibility_gate_candidate_score" in scores.columns
     assert "criticality_tuner_candidate_score" in scores.columns
+    assert scores.iloc[0]["hysteresis_candidate_score_weighting_scheme"] == "equal_weight_mean_screening_composite"
+    assert "uncalibrated" in scores.iloc[0]["hysteresis_candidate_score_calibration_status"]
+
+
+def test_primitive_score_manifest_marks_composites_as_screening_views():
+    manifest = primitive_score_manifest()
+    assert manifest["score_status"] == "uncalibrated_equal_weight_screening_composite"
+    assert manifest["interpretation_order"] == [
+        "measured_feature_profile",
+        "statistical_anomaly_after_controls_and_nulls",
+        "post_hoc_mechanistic_hypothesis",
+    ]
+    assert "hysteresis_candidate_score" in manifest["components"]
+    assert "audit_double_counting_between_correlated_features" in manifest["required_validation_before_mechanistic_use"]
 
 
 def test_ontology_distinguishes_candidate_and_confirmed_names():
@@ -43,7 +57,10 @@ def test_ontology_distinguishes_candidate_and_confirmed_names():
     assert hysteresis.requires_dynamic_data is True
     assert "static sequence" in hysteresis.forbidden_interpretation
 
-    quantum = get_primitive("quantum_susceptible_domain_candidate")
-    assert quantum.confirmed_name == "physical_susceptibility_domain"
-    assert quantum.requires_dynamic_data is False
-    assert "Do not claim actual quantum effects" in quantum.forbidden_interpretation
+    physical = get_primitive("non_B_DNA_physical_susceptibility_candidate")
+    assert physical.confirmed_name == "physical_susceptibility_domain"
+    assert physical.requires_dynamic_data is False
+    assert "Do not claim quantum susceptibility" in physical.forbidden_interpretation
+
+    legacy = get_primitive("quantum_susceptible_domain_candidate")
+    assert legacy.candidate_name == "non_B_DNA_physical_susceptibility_candidate"

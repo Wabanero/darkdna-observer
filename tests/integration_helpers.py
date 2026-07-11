@@ -61,8 +61,10 @@ def assert_pipeline_outputs(outdir: Path) -> None:
         "dark_windows.parquet",
         "sequence_features.parquet",
         "primitive_scores.parquet",
+        "primitive_score_manifest.json",
         "classical_covariates.parquet",
         "null_model_summary.parquet",
+        "null_model_registry.json",
         "residual_scores.parquet",
         "candidate_primitives.parquet",
         "candidate_loci.parquet",
@@ -112,8 +114,12 @@ def assert_pipeline_outputs(outdir: Path) -> None:
     assert all(card.get("primitive_hypothesis") for card in cards)
     assert all(card.get("mechanistic_bridge") for card in cards)
     assert all("assay_scope_if_bridge_missing" in card.get("mechanistic_bridge", {}) for card in cards)
+    assert all(card.get("causal_validation_hierarchy") for card in cards)
+    assert all(card.get("native_context_caveat") for card in cards)
     assert all(card.get("feature_hypothesis_boundary") for card in cards)
     assert all(card.get("terminology_scope") for card in cards)
     assert all(card.get("assembly_pangenome_context") for card in cards)
+    assert all(card.get("score_methodology") for card in cards)
+    assert all(card.get("null_model_panel") for card in cards)
     assert all(card.get("required_validation_data") for card in cards)
     assert all(card.get("suggested_prompt2_view") for card in cards)

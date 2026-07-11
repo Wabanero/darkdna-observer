@@ -48,16 +48,16 @@ PRIMITIVES: dict[str, PrimitiveClass] = {
         "Do not interpret as a decoded semantic language or teleological program.",
         "grammar scramble / tiling perturbation view",
     ),
-    "quantum_susceptible_domain": PrimitiveClass(
-        "quantum_susceptible_domain",
-        "quantum_susceptible_domain_candidate",
+    "non_B_DNA_physical_susceptibility": PrimitiveClass(
+        "non_B_DNA_physical_susceptibility",
+        "non_B_DNA_physical_susceptibility_candidate",
         "physical_susceptibility_domain",
         "sequence_plus_optional_physical_assay",
         True,
         False,
         "Sequence-derived physical-susceptibility proxy based on G-richness, G4 potential, oxidation-prone contexts, G-skewness, non-B-DNA propensity and charge-transfer-like sequence contexts.",
         "Sequence-derived physical-susceptibility proxy based on G-richness, G4 potential, oxidation-prone contexts, G-skewness, non-B-DNA propensity and charge-transfer-like sequence contexts.",
-        "Do not claim actual quantum effects.",
+        "Do not claim quantum susceptibility, actual quantum effects, or charge-transfer dynamics from sequence proxies alone.",
         "physical validation / charge-oxidation susceptibility view",
     ),
     "replication_instability": PrimitiveClass(
@@ -200,6 +200,9 @@ for key, primitive in PRIMITIVES.items():
     _ALIASES[key] = key
     _ALIASES[primitive.candidate_name] = key
     _ALIASES[primitive.confirmed_name] = key
+_ALIASES["quantum_susceptible_domain"] = "non_B_DNA_physical_susceptibility"
+_ALIASES["quantum_susceptible_domain_candidate"] = "non_B_DNA_physical_susceptibility"
+_ALIASES["quantum_susceptible_domain_candidate_score"] = "non_B_DNA_physical_susceptibility"
 
 
 def primitive_names() -> list[str]:

@@ -16,7 +16,15 @@ def test_region_card_contains_assay_blueprint_fields():
             "artifact_risk_flags": [""],
         }
     )
-    labels = pd.DataFrame({"region_id": ["r1"], "primitive_class": ["negative_space_element_candidate"], "primitive_confidence": [0.8], "top_supporting_features": ["depleted_kmer_score"]})
+    labels = pd.DataFrame(
+        {
+            "region_id": ["r1"],
+            "primitive_class": ["negative_space_element_candidate"],
+            "primitive_score_name": ["negative_space_element_candidate_score"],
+            "primitive_confidence": [0.8],
+            "top_supporting_features": ["depleted_kmer_score"],
+        }
+    )
     residuals = pd.DataFrame(
         {
             "region_id": ["r1"],
@@ -39,9 +47,14 @@ def test_region_card_contains_assay_blueprint_fields():
     assert cards[0]["mechanistic_bridge"]["bridge_status"] == "hypothesized_bridge_requires_validation"
     assert cards[0]["mechanistic_bridge"]["direct_primitive_validation_allowed"] is False
     assert "exploratory_only" in cards[0]["assay_validation_scope"]
+    assert "endogenous_CRISPRi_or_CRISPRa" in cards[0]["causal_validation_hierarchy"]
+    assert "genomic position" in cards[0]["native_context_caveat"]
     assert "not observed molecular properties" in cards[0]["feature_hypothesis_boundary"]
     assert "Dark is an operational project term" in cards[0]["terminology_scope"]["dark_operational_use"]
     assert cards[0]["assembly_pangenome_context"]["current_scope"] == "reference_based_window"
+    assert cards[0]["score_methodology"]["score_status"] == "uncalibrated_equal_weight_screening_composite"
+    assert "depleted_kmer_score" in cards[0]["score_methodology"]["component_features"]
+    assert cards[0]["null_model_panel"]["status"] == "insufficient_single_matched_null_until_complementary_nulls_pass"
 
 
 def test_region_card_uses_primitive_specific_key_tests():
@@ -60,7 +73,7 @@ def test_region_card_uses_primitive_specific_key_tests():
     labels = pd.DataFrame(
         {
             "region_id": ["r1", "r2"],
-            "primitive_class": ["fractal_scaffold_candidate", "quantum_susceptible_domain_candidate"],
+            "primitive_class": ["fractal_scaffold_candidate", "non_B_DNA_physical_susceptibility_candidate"],
             "primitive_confidence": [0.8, 0.8],
             "top_supporting_features": ["fractal_score", "G4_susceptibility_proxy"],
         }
@@ -68,7 +81,7 @@ def test_region_card_uses_primitive_specific_key_tests():
     residuals = pd.DataFrame(
         {
             "region_id": ["r1", "r2"],
-            "primitive": ["fractal_scaffold_candidate_score", "quantum_susceptible_domain_candidate_score"],
+            "primitive": ["fractal_scaffold_candidate_score", "non_B_DNA_physical_susceptibility_candidate_score"],
             "observed_score": [2.0, 2.0],
             "residual_zscore": [3.0, 3.0],
             "matched_null_zscore": [2.5, 2.5],
@@ -81,10 +94,11 @@ def test_region_card_uses_primitive_specific_key_tests():
     tests_by_primitive = {card["primitive_class"]: card["key_interaction_test"] for card in cards}
     bridge_by_primitive = {card["primitive_class"]: card["mechanistic_bridge"] for card in cards}
     assert tests_by_primitive["fractal_scaffold_candidate"].startswith("folding_scale_effect")
-    assert tests_by_primitive["quantum_susceptible_domain_candidate"].startswith("physical_susceptibility_effect")
+    assert tests_by_primitive["non_B_DNA_physical_susceptibility_candidate"].startswith("physical_susceptibility_effect")
     assert len(set(tests_by_primitive.values())) == 2
     assert "polymer physics or coarse-grained DNA simulations" in bridge_by_primitive["fractal_scaffold_candidate"]["candidate_intermediate_processes"]
     assert "test GC-, dinucleotide-, and k-mer-preserved controls" in bridge_by_primitive["fractal_scaffold_candidate"]["required_bridge_evidence"]
+    assert "quantum" not in bridge_by_primitive["non_B_DNA_physical_susceptibility_candidate"]["measured_feature"].lower()
 
 
 def test_no_call_and_unexplained_do_not_use_generic_key_test():
@@ -150,6 +164,7 @@ def test_region_cards_keep_observed_features_separate_from_hypothesis():
         {
             "region_id": ["r1"],
             "primitive_class": ["sequence_regime_boundary_candidate"],
+            "primitive_score_name": ["sequence_regime_boundary_candidate_score"],
             "primitive_confidence": [0.7],
             "top_supporting_features": ["entropy_boundary_score;gc_left_right_delta"],
         }
@@ -164,6 +179,9 @@ def test_region_cards_keep_observed_features_separate_from_hypothesis():
             "empirical_p_value": [0.02],
             "classical_explanation_fraction": [0.25],
             "covariates_used": ["gc_content;mappability"],
+            "null_panel_status": ["insufficient_single_matched_null_until_complementary_nulls_pass"],
+            "available_null_models": ["matched_controls_v1"],
+            "missing_or_partial_null_models": ["dinucleotide_preserving_shuffle,kmer_preserving_shuffle"],
         }
     )
 
@@ -176,6 +194,9 @@ def test_region_cards_keep_observed_features_separate_from_hypothesis():
     assert card["assembly_pangenome_context"]["available_reference_context"]["mappability"] == 0.2
     assert card["assembly_pangenome_context"]["available_reference_context"]["overlaps_segmental_duplication"] is True
     assert "presence_absence_variation" in card["assembly_pangenome_context"]["missing_first_class_inputs"]
+    assert card["score_methodology"]["component_features"] == ["boundary_condition_candidate_score"]
+    assert "dinucleotide_preserving_shuffle" in card["null_model_panel"]["missing_or_partial_null_models"]
+    assert "kmer_preserving_shuffle" in card["null_model_panel"]["missing_or_partial_null_models"]
     assert hypothesis["candidate_label"] == "sequence_regime_boundary_candidate"
     assert hypothesis["hypothesis_statement"] != observed["supporting_features"][0]
     assert card["candidate_only"] is True

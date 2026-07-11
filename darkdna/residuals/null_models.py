@@ -1,7 +1,13 @@
-"""Matched null model generation and summaries."""
+"""Matched null model generation and summaries.
+
+The current implementation provides a first matched-control null. It also
+emits a registry of required complementary nulls so downstream reports do not
+mistake one z-score for a severe null panel.
+"""
 
 from __future__ import annotations
 
+import json
 import random
 from collections import defaultdict
 from pathlib import Path
@@ -12,6 +18,93 @@ import pandas as pd
 from darkdna.utils.progress import ProgressReporter
 from darkdna.utils.stats import empirical_p_value
 from darkdna.views.primitive_scores import PRIMITIVE_SCORE_COLUMNS
+
+
+NULL_MODEL_REGISTRY: list[dict[str, str]] = [
+    {
+        "null_model_id": "matched_controls_v1",
+        "status": "implemented",
+        "description": "Nearby/similar genomic controls matched on available covariates.",
+    },
+    {
+        "null_model_id": "same_length_gc_matched",
+        "status": "partially_available_via_matched_controls",
+        "description": "Controls with similar length/window size and GC content.",
+    },
+    {
+        "null_model_id": "dinucleotide_preserving_shuffle",
+        "status": "helper_available_not_pipeline_integrated",
+        "description": "Synthetic sequence shuffle preserving much dinucleotide texture.",
+    },
+    {
+        "null_model_id": "kmer_preserving_shuffle",
+        "status": "helper_available_not_pipeline_integrated",
+        "description": "Synthetic sequence shuffle preserving local k-mer blocks.",
+    },
+    {
+        "null_model_id": "te_family_age_matched",
+        "status": "requires_tracks",
+        "description": "Controls matched on TE family and TE age/divergence annotations.",
+    },
+    {
+        "null_model_id": "chromatin_compartment_matched",
+        "status": "requires_tracks",
+        "description": "Controls matched on A/B compartment or comparable chromatin state.",
+    },
+    {
+        "null_model_id": "replication_timing_matched",
+        "status": "requires_tracks",
+        "description": "Controls matched on replication timing signal.",
+    },
+    {
+        "null_model_id": "recombination_mutation_environment_matched",
+        "status": "requires_tracks",
+        "description": "Controls matched on recombination, mutation-rate, or damage environment.",
+    },
+    {
+        "null_model_id": "gene_tss_distance_matched",
+        "status": "implemented_if_distance_to_nearest_tss_available",
+        "description": "Controls matched on gene/TSS proximity.",
+    },
+    {
+        "null_model_id": "nearby_genomic_controls",
+        "status": "partially_available_via_matched_controls",
+        "description": "Local genomic controls rather than genome-wide random controls.",
+    },
+    {
+        "null_model_id": "syntenic_ortholog_controls",
+        "status": "not_implemented",
+        "description": "Orthologous or syntenic sequence controls across assemblies/species.",
+    },
+    {
+        "null_model_id": "population_frequency_controls",
+        "status": "not_implemented",
+        "description": "Controls matched on allele frequency, presence/absence, or copy number.",
+    },
+    {
+        "null_model_id": "reversed_or_synthetic_sequences",
+        "status": "not_pipeline_integrated",
+        "description": "Reverse, scrambled, or synthetic controls for transformation robustness.",
+    },
+]
+
+
+def null_model_registry() -> list[dict[str, str]]:
+    return [dict(item) for item in NULL_MODEL_REGISTRY]
+
+
+def null_panel_status() -> dict:
+    implemented = [item["null_model_id"] for item in NULL_MODEL_REGISTRY if item["status"] == "implemented"]
+    not_fully_implemented = [
+        item["null_model_id"]
+        for item in NULL_MODEL_REGISTRY
+        if item["status"] != "implemented"
+    ]
+    return {
+        "status": "insufficient_single_matched_null_until_complementary_nulls_pass",
+        "implemented_null_models": implemented,
+        "missing_or_partial_null_models": not_fully_implemented,
+    }
 
 
 def gc_matched_shuffle(seq: str, seed: int = 13) -> str:
@@ -64,7 +157,18 @@ def matched_feature_columns(features: pd.DataFrame) -> list[str]:
         "simple_repeat_fraction",
         "CpG_density",
         "TE_overlap_fraction",
+        "TE_family",
+        "TE_age",
+        "TE_divergence",
         "local_TE_density",
+        "distance_to_nearest_tss",
+        "chromatin_compartment",
+        "replication_timing",
+        "recombination_rate",
+        "mutation_rate",
+        "copy_number",
+        "presence_absence_frequency",
+        "population_frequency",
         "chrom",
     ]
     return [col for col in candidates if col in features.columns]
@@ -117,6 +221,9 @@ def build_matched_null_models(
     reporter = ProgressReporter("build-null-models", total=len(region_ids)) if progress else None
     if reporter:
         reporter.start(f"matching controls n_controls={n_controls}")
+    panel_status = null_panel_status()
+    registry_ids = [item["null_model_id"] for item in NULL_MODEL_REGISTRY]
+    missing_or_partial = panel_status["missing_or_partial_null_models"]
     for idx, region_id in enumerate(region_ids, start=1):
         controls = select_matched_controls(features, region_id, n=n_controls)
         if controls.empty:
@@ -142,6 +249,9 @@ def build_matched_null_models(
                     "null_zscore": float(null_z),
                     "empirical_p_value": empirical_p_value(observed, null_values, higher=True),
                     "matched_features_used": ",".join(matched_feature_columns(features)),
+                    "null_panel_status": panel_status["status"],
+                    "available_null_models": ",".join(registry_ids),
+                    "missing_or_partial_null_models": ",".join(missing_or_partial),
                 }
             )
         if reporter:
@@ -158,4 +268,6 @@ def write_matched_nulls(nulls: pd.DataFrame, outdir: str | Path) -> Path:
     nulls.to_parquet(path, index=False)
     alias = out / "null_model_summary.parquet"
     nulls.to_parquet(alias, index=False)
+    registry_path = out / "null_model_registry.json"
+    registry_path.write_text(json.dumps(null_model_registry(), indent=2), encoding="utf-8")
     return path

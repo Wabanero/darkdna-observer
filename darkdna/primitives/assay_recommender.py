@@ -67,8 +67,8 @@ MECHANISTIC_BRIDGES: dict[str, dict] = {
             "show a molecular readout changes before interpreting any dynamic phenotype",
         ],
     ),
-    "quantum_susceptible_domain_candidate": _bridge(
-        "G-richness, G4/non-B-DNA propensity, oxidation-prone context, or charge-transfer proxy",
+    "non_B_DNA_physical_susceptibility_candidate": _bridge(
+        "G-richness, G4/non-B-DNA propensity, oxidation-prone context, or charge/oxidation proxy",
         "physical susceptibility under oxidation, ionic, thermal, or structural perturbation",
         [
             "G4 or non-B-DNA folding",
@@ -275,11 +275,11 @@ ASSAY_BLUEPRINTS: dict[str, dict] = {
         "classical_validation": ["tiling MPRA", "synthetic reporter library"],
         "key_interaction_test": "grammar_effect = (Native_readout - MotifPreservedSpacingRandomized_readout) - (SpacingPreservedMotifMutated_readout - NeutralControl_readout)",
     },
-    "quantum_susceptible_domain_candidate": {
+    "non_B_DNA_physical_susceptibility_candidate": {
         "assay": "Charge-Oxidation Susceptibility Assay",
         "sequence_controls": ["native", "G-tract disrupted", "G4-disrupting mutant", "GC-matched control", "reverse complement", "methylated native"],
         "perturbations": ["mild oxidative stress", "temperature shift", "altered ionic condition", "UV/photosensitized oxidation if appropriate"],
-        "readouts": ["8-oxoG formation", "G4 folding/unfolding", "nanopore dwell-time anomaly", "charge-transfer proxy"],
+        "readouts": ["8-oxoG formation", "G4 folding/unfolding", "nanopore dwell-time anomaly", "physical susceptibility proxy"],
         "classical_validation": ["G4-seq/G4-ChIP-seq overlap if available", "oxidative lesion mapping"],
         "key_interaction_test": "physical_susceptibility_effect = (Native_oxidation_or_G4_signal - G4Disrupted_signal) - (GCMatchedControl_oxidation_or_G4_signal - GCMatchedControl_baseline)",
     },

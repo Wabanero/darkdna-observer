@@ -10,7 +10,9 @@ import pandas as pd
 
 from darkdna.primitives.assay_recommender import recommend_assay
 from darkdna.primitives.ontology import get_primitive
+from darkdna.residuals.null_models import null_panel_status
 from darkdna.utils.progress import ProgressReporter
+from darkdna.views.primitive_scores import primitive_score_manifest
 
 
 TERMINOLOGY_SCOPE = {
@@ -24,6 +26,16 @@ TERMINOLOGY_SCOPE = {
         "is not sufficient evidence of selected biological function."
     ),
 }
+
+CAUSAL_VALIDATION_HIERARCHY = [
+    "in_silico_mutagenesis_or_sequence_model_sanity_check",
+    "MPRA_or_STARR_seq_or_synthetic_reporter_library",
+    "endogenous_CRISPRi_or_CRISPRa",
+    "small_deletion_base_editing_or_prime_editing",
+    "single_cell_perturbation_RNA_ATAC_or_multiome",
+    "knockin_or_knockout_model_when_justified",
+    "phenotype_under_challenge_ageing_stress_differentiation_or_development",
+]
 
 
 def _finite_float(value: object) -> float | None:
@@ -100,6 +112,44 @@ def residualization_summary(residuals: pd.DataFrame, region_id: str) -> dict:
     }
 
 
+def score_methodology_summary(label: pd.Series) -> dict:
+    manifest = primitive_score_manifest()
+    primitive_score_name = str(label.get("primitive_score_name", ""))
+    return {
+        "primitive_score_name": primitive_score_name,
+        "score_status": manifest["score_status"],
+        "component_features": manifest["components"].get(primitive_score_name, []),
+        "weighting_scheme": "equal_weight_mean_screening_composite",
+        "caveat": manifest["caveat"],
+        "interpretation_order": manifest["interpretation_order"],
+        "required_validation_before_mechanistic_use": manifest["required_validation_before_mechanistic_use"],
+    }
+
+
+def null_model_panel_summary(residuals: pd.DataFrame, region_id: str) -> dict:
+    subset = residuals[residuals["region_id"].astype(str) == str(region_id)]
+    fallback = null_panel_status()
+    caveat = "A single matched-null z-score is insufficient without complementary null models."
+    if subset.empty:
+        return {
+            "status": fallback["status"],
+            "available_null_models": fallback["implemented_null_models"],
+            "missing_or_partial_null_models": fallback["missing_or_partial_null_models"],
+            "caveat": caveat,
+        }
+    row = subset.iloc[0]
+    available = str(row.get("available_null_models", "") or "")
+    missing = str(row.get("missing_or_partial_null_models", "") or "")
+    return {
+        "status": str(row.get("null_panel_status", "") or fallback["status"]),
+        "available_null_models": [item for item in available.split(",") if item]
+        or fallback["implemented_null_models"],
+        "missing_or_partial_null_models": [item for item in missing.split(",") if item]
+        or fallback["missing_or_partial_null_models"],
+        "caveat": caveat,
+    }
+
+
 def build_region_card(
     window: pd.Series,
     label: pd.Series,
@@ -160,6 +210,8 @@ def build_region_card(
         "candidate_statement": "This is a sequence-derived candidate hypothesis, not a confirmed biological primitive.",
         "terminology_scope": TERMINOLOGY_SCOPE,
         "assembly_pangenome_context": assembly_pangenome_context(window),
+        "score_methodology": score_methodology_summary(label),
+        "null_model_panel": null_model_panel_summary(residuals, region_id),
         "confirmed_name": ontology.confirmed_name,
         "requires_dynamic_validation": bool(ontology.requires_dynamic_data),
         "required_validation_data": ontology.required_input_level,
@@ -168,6 +220,11 @@ def build_region_card(
         "primitive_hypothesis": primitive_hypothesis,
         "mechanistic_bridge": mechanistic_bridge,
         "assay_validation_scope": mechanistic_bridge.get("assay_scope_if_bridge_missing", ""),
+        "causal_validation_hierarchy": CAUSAL_VALIDATION_HIERARCHY,
+        "native_context_caveat": (
+            "Plasmid or synthetic reporter assays lose genomic position, chromatin, 3D contacts, "
+            "replication timing, allele context, nearby TE context, and nuclear compartment."
+        ),
         "feature_hypothesis_boundary": (
             "Observed features are measured sequence/statistical evidence; "
             "primitive labels are assay-generating hypotheses, not observed molecular properties."
@@ -251,8 +308,11 @@ def write_region_cards(cards: list[dict], outdir: str | Path) -> dict[str, Path]
                 "artifact_risk_flags": c["artifact_risk_flags"],
                 "feature_hypothesis_boundary": c["feature_hypothesis_boundary"],
                 "assembly_pangenome_caveat": c["assembly_pangenome_context"]["caveat"],
+                "score_methodology_caveat": c["score_methodology"]["caveat"],
+                "null_model_panel_status": c["null_model_panel"]["status"],
                 "mechanistic_bridge_status": c["mechanistic_bridge"].get("bridge_status", ""),
                 "assay_validation_scope": c["assay_validation_scope"],
+                "native_context_caveat": c["native_context_caveat"],
                 "recommended_primitive_assay": c["recommended_primitive_assay"],
             }
             for c in cards

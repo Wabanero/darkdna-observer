@@ -31,6 +31,14 @@ def test_html_report_generation(tmp_path):
             "primitive_hypothesis": {"hypothesis_statement": "Sequence-derived negative-space substrate candidate."},
             "terminology_scope": {"dark_operational_use": "Dark is operational."},
             "assembly_pangenome_context": {"caveat": "Reference-scoped candidate."},
+            "score_methodology": {
+                "score_status": "uncalibrated_equal_weight_screening_composite",
+                "caveat": "Screening composite.",
+            },
+            "null_model_panel": {
+                "status": "insufficient_single_matched_null_until_complementary_nulls_pass",
+                "caveat": "Single null is insufficient.",
+            },
             "recommended_primitive_assay": "Negative-Space Rescue/Scramble Assay",
             "key_interaction_test": "effect = test",
             "interpretation_caveat": "hypothesis",
@@ -46,6 +54,8 @@ def test_html_report_generation(tmp_path):
     assert "Primitive hypothesis" in html
     assert "Assembly context" in html
     assert "Terminology" in html
+    assert "Score methodology" in html
+    assert "Null model panel" in html
     assert "Prompt" not in html
     assert (tmp_path / "multipanel_summary.svg").exists()
     assert (tmp_path / "classical_control_multipanel.svg").exists()

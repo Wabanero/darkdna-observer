@@ -24,7 +24,7 @@ def test_prompt1_candidate_only_labels():
         "criticality_tuner_candidate",
         "chromatin_motion_oscillator_candidate",
         "replication_instability_candidate",
-        "quantum_susceptible_domain_candidate",
+        "non_B_DNA_physical_susceptibility_candidate",
         "sequence_regime_boundary_candidate",
         "negative_space_element_candidate",
         "TE_grammar_node_candidate",
@@ -36,6 +36,7 @@ def test_prompt1_candidate_only_labels():
     names = set(primitive_names())
     assert forbidden_confirmed.isdisjoint(names)
     assert allowed_candidates.issubset(names)
+    assert "quantum_susceptible_domain_candidate" not in names
 
 
 def test_sequence_only_commands_do_not_emit_prompt2_dynamic_scores():

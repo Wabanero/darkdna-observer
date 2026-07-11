@@ -7,7 +7,7 @@ from tests.integration_helpers import assert_pipeline_outputs, run_cli_pipeline,
 
 
 SCORE_BY_CANDIDATE = {
-    "quantum_susceptible_domain_candidate": "quantum_susceptible_domain_candidate_score",
+    "non_B_DNA_physical_susceptibility_candidate": "non_B_DNA_physical_susceptibility_candidate_score",
     "resonant_pulse_decoder_candidate": "resonant_pulse_decoder_candidate_score",
     "sequence_regime_boundary_candidate": "sequence_regime_boundary_candidate_score",
     "negative_space_element_candidate": "negative_space_element_candidate_score",

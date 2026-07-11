@@ -69,7 +69,7 @@ def build_toy_records(seed: int = 42) -> tuple[dict[str, str], list[dict[str, ob
             "chrom": "toy_chr1",
             "start": 32_000,
             "end": 33_600,
-            "expected_candidate_type": "quantum_susceptible_domain_candidate",
+            "expected_candidate_type": "non_B_DNA_physical_susceptibility_candidate",
             "expected_high_score_family": "physical_susceptibility",
             "seq": repeat_to_length("GGGAGGGCGGGTTGGGAA", 1_600),
         },

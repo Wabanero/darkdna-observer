@@ -14,7 +14,7 @@ from .locus_candidates import write_candidate_locus_outputs
 PRIMITIVE_TRACKS = {
     "fractal_scaffold_candidate": "fractal_scaffold_candidates.bed",
     "constraint_grammar_region_candidate": "constraint_grammar_candidates.bed",
-    "quantum_susceptible_domain_candidate": "physical_susceptibility_candidates.bed",
+    "non_B_DNA_physical_susceptibility_candidate": "physical_susceptibility_candidates.bed",
     "replication_instability_candidate": "replication_instability_candidates.bed",
     "decoherence_boundary_candidate": "decoherence_boundary_candidates.bed",
     "resonant_pulse_decoder_candidate": "resonant_pulse_decoder_candidates.bed",

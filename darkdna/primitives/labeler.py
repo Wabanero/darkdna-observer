@@ -15,7 +15,8 @@ from .assay_recommender import recommend_assay
 SCORE_TO_PRIMITIVE = {
     "fractal_scaffold_candidate_score": "fractal_scaffold_candidate",
     "constraint_grammar_region_candidate_score": "constraint_grammar_region_candidate",
-    "quantum_susceptible_domain_candidate_score": "quantum_susceptible_domain_candidate",
+    "non_B_DNA_physical_susceptibility_candidate_score": "non_B_DNA_physical_susceptibility_candidate",
+    "quantum_susceptible_domain_candidate_score": "non_B_DNA_physical_susceptibility_candidate",
     "replication_instability_candidate_score": "replication_instability_candidate",
     "decoherence_boundary_candidate_score": "decoherence_boundary_candidate",
     "resonant_pulse_decoder_candidate_score": "resonant_pulse_decoder_candidate",
@@ -32,7 +33,7 @@ SCORE_TO_PRIMITIVE = {
 DOMINANCE_FEATURES = {
     "fractal_scaffold_candidate": ["fractal_score", "scale_persistence_score"],
     "constraint_grammar_region_candidate": ["grammar_entropy", "Markov_order_anomaly", "motif_like_token_recurrence"],
-    "quantum_susceptible_domain_candidate": ["G4_susceptibility_proxy", "non_B_DNA_aggregate_score", "charge_oxidation_susceptibility_score"],
+    "non_B_DNA_physical_susceptibility_candidate": ["G4_susceptibility_proxy", "non_B_DNA_aggregate_score", "charge_oxidation_susceptibility_score"],
     "replication_instability_candidate": ["fork_texture_score", "simple_repeat_fraction", "palindrome_density"],
     "decoherence_boundary_candidate": ["decoherence_boundary_candidate_score", "entropy_boundary_score"],
     "resonant_pulse_decoder_candidate": ["phase_periodicity_around_10bp", "spacing_periodicity_fourier_power"],

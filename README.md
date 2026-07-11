@@ -90,7 +90,7 @@ review, but the labels are not themselves observed molecular properties.
 | --- | --- | --- | --- |
 | `fractal_scaffold_candidate` | fractal score, scale persistence, compression anomaly | Scale-persistent sequence texture or numeric-walk structure. | Folding, compaction, or multiscale perturbation assays with shuffled controls. |
 | `constraint_grammar_region_candidate` | grammar entropy, forbidden-word depletion, motif-like recurrence, Markov anomaly | Sequence grammar or spacing structure that is not explained by simple composition. | Grammar scramble, tiling, motif/spacing perturbation assays. |
-| `quantum_susceptible_domain_candidate` | G4, non-B-DNA aggregate, charge/oxidation susceptibility proxies | Physical-susceptibility candidate based on G-rich and non-B-prone sequence contexts. | G4/oxidation/nanopore or other physical validation. No claim of actual quantum effects. |
+| `non_B_DNA_physical_susceptibility_candidate` | G4, non-B-DNA aggregate, charge/oxidation susceptibility proxies | Physical-susceptibility candidate based on G-rich and non-B-prone sequence contexts. | G4/oxidation/nanopore or other physical validation. No claim of quantum susceptibility or actual quantum effects. |
 | `replication_instability_candidate` | fork texture, repeats, palindromes, skew, non-B propensity | Sequence architecture compatible with replication-stress susceptibility. | Replication timing, fork-pausing, or stress/recovery assays. |
 | `chromatin_motion_oscillator_candidate` | spacing autocorrelation, bendability proxy, entropy asymmetry | Static sequence candidate for locus-motion or spatial-dynamics testing. | Live-locus motion or spatial-dynamics assays. |
 | `decoherence_boundary_candidate` | entropy cliffs, boundary scores, compression changes, feature voids | Noise/variance boundary candidate from sequence-regime transitions. | Single-cell variance, reporter covariance, or noise-propagation assays. |
@@ -106,6 +106,14 @@ review, but the labels are not themselves observed molecular properties.
 Every primitive score is paired with robust z-scores, empirical p-values,
 matched-null summaries, residual anomaly scores, and artifact-risk flags.
 
+The old internal/public label `quantum_susceptible_domain_candidate` has been
+retired. G-richness, G4 propensity, oxidation-prone contexts, Z-DNA/R-loop/triplex
+signals, and other non-B-DNA features support a conservative
+`non_B_DNA_physical_susceptibility_candidate`. They do not support inference of
+quantum susceptibility or charge-transfer dynamics without explicit physical
+modelling of conformation, solvent, ions, stacking, base modifications, protein
+binding, chromatin compaction, temperature, and electronic dynamics.
+
 ## Observed Feature Evidence vs Primitive Hypothesis
 
 DarkDNA-Observer keeps two concepts separate.
@@ -120,6 +128,43 @@ measurements survive the available controls. Region cards therefore report both
 `observed_feature_evidence` and `primitive_hypothesis`. The former is data; the
 latter is an assay-generating claim that remains unconfirmed until an
 appropriate validation experiment is performed.
+
+The preferred interpretation order is:
+
+```text
+measured feature profile
+  -> statistical anomaly after controls and null models
+  -> post-hoc mechanistic hypothesis
+```
+
+The reverse order is not allowed: a high `hysteresis_candidate_score`, for
+example, is not evidence that a locus has hysteresis. It is only a screening
+view that can motivate a better calibrated anomaly analysis and, eventually, a
+specific perturbation experiment.
+
+## Composite Score Caveat
+
+Current primitive score columns are equal-weight screening composites. They are
+useful as transparent review views, but their weights are not yet learned,
+probabilistically calibrated, or validated as stable biological quantities.
+
+Before a composite can be treated as more than a ranking heuristic, the project
+must show:
+
+- why each feature and weight is used, or replace manual weights with a learned
+  and validated model
+- stability across organisms, strains, accessions, and assemblies
+- robustness to sequence transformations such as reverse, scramble,
+  dinucleotide-preserving shuffle, and k-mer-preserving shuffle
+- absence of double counting among correlated features such as repeat density,
+  entropy, compression, low complexity, and non-B-DNA proxies
+- probabilistic calibration on held-out loci
+- reproducibility under held-out chromosome or genomic-block splits
+
+The committed pipeline now writes `primitive_score_manifest.json` next to
+`primitive_scores.parquet`. That manifest lists the current component features,
+the equal-weight status, and the validation work required before mechanistic
+interpretation.
 
 ## Classical Controls And Residuals
 
@@ -151,6 +196,31 @@ The result should be read together with `classical_explanation_fraction`,
 `matched_null_zscore`, `empirical_p_value`, and artifact flags. A high residual
 with weak matched-null support is a review target; a high residual with strong
 matched-null support is a stronger assay candidate.
+
+A single matched-null z-score is still not sufficient. Candidate strength should
+come from a panel of complementary null models, not from one convenient control
+set.
+
+Required null families include:
+
+- same length and GC controls
+- dinucleotide-preserving shuffles
+- k-mer-preserving shuffles
+- TE-family and TE-age matched controls
+- chromatin-compartment matched controls
+- replication-timing matched controls
+- recombination, mutation, or damage-environment matched controls
+- gene/TSS-distance matched controls
+- nearby genomic controls
+- syntenic ortholog controls
+- population-frequency, copy-number, or presence/absence controls
+- reversed or synthetic sequence controls
+
+The current implementation provides `matched_controls_v1` and helper functions
+for some sequence shuffles, but it does not yet run the full severe null panel.
+The pipeline therefore writes `null_model_registry.json`, and region cards carry
+`null_model_panel` so downstream users can see which null families are missing
+or only partially available.
 
 ## Assembly And Pangenome First
 
@@ -427,9 +497,11 @@ Feature, score, and residual commands write:
 
 - `sequence_features.parquet`
 - `primitive_scores.parquet`
+- `primitive_score_manifest.json`
 - `classical_covariates.parquet`
 - `matched_nulls.parquet`
 - `null_model_summary.parquet`
+- `null_model_registry.json`
 - `residual_scores.parquet`
 - `residualization_summary.json`
 - `primitive_labels.parquet`
@@ -481,7 +553,7 @@ effect = (Native_treatment - Native_control) - (ControlSequence_treatment - Cont
 
 The report renders a primitive-specific version of that contrast for each card:
 folding/compaction for `fractal_scaffold_candidate`, oxidation/G4 or physical
-susceptibility for `quantum_susceptible_domain_candidate`, fork pausing for
+susceptibility for `non_B_DNA_physical_susceptibility_candidate`, fork pausing for
 `replication_instability_candidate`, pulse/frequency response for
 `resonant_pulse_decoder_candidate`, state-transition probability for
 `possibility_gate_candidate`, and so on.
@@ -516,6 +588,25 @@ as primitive validation.
 If the bridge is unvalidated or missing, the assay remains exploratory. It can
 generate bridge evidence, but it should not be reported as direct validation of
 the proposed primitive.
+
+## Causal Validation Hierarchy
+
+Region cards recommend validation as a hierarchy, not as a single plasmid test.
+Native-versus-scrambled reporter assays are useful, but they lose genomic
+position, chromatin, 3D contacts, replication timing, allele context, nearby TE
+context, and nuclear compartment. Stronger follow-up should escalate through:
+
+- in silico mutagenesis and sequence-model sanity checks
+- MPRA/STARR-seq or synthetic reporter libraries
+- endogenous CRISPRi/CRISPRa where the locus remains in its native context
+- small deletions, base editing, or prime editing of the candidate feature
+- single-cell perturbation with RNA/ATAC/multiome readout
+- knock-in or knockout models when organism and locus justify it
+- phenotype under challenge, ageing, stress, differentiation, or development
+
+Interpretation rule: an MPRA-positive sequence is not automatically a native
+regulatory element, and a native perturbation effect is still not proof of a
+primitive unless the mechanistic bridge is also supported.
 
 ## Supported Inputs
 
@@ -562,15 +653,19 @@ The next build order is:
    RepeatMasker/TE annotation, mappability, blacklist, gap, and centromere or
    telomere tracks.
 3. Strengthen surrogate null models beyond the current matched controls,
-   including sequence shuffles that preserve selected low-order properties,
-   local block structure, and annotation context.
+   including same length/GC controls, dinucleotide-preserving shuffles,
+   k-mer-preserving shuffles, TE-family/age matching, chromatin-compartment
+   matching, replication-timing matching, recombination/mutation environment
+   matching, gene/TSS-distance matching, nearby genomic controls, syntenic
+   ortholog controls, population-frequency controls, and reversed or synthetic
+   sequence controls.
 4. Add held-out and locus-level statistical calibration: per-locus splits,
    out-of-sample calibration curves, larger-genome chromosome/block
    cross-validation benchmarks, false-discovery diagnostics, and matched-null
    calibration panels.
 5. Add foundation-model baselines so primitive scores can be compared against
-   embeddings or likelihoods from established DNA language models rather than
-   only against hand-built sequence views.
+   Enformer, Borzoi, AlphaGenome, or equivalent sequence-to-function models
+   rather than only against hand-built sequence views.
 6. Make quantitative tracks first-class inputs: ATAC/RNA/ChIP/CUT&Tag,
    conservation, replication timing, recombination, methylation, and other
    bigWig/bedGraph signals with per-track summaries and report panels.
