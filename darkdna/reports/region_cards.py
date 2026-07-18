@@ -147,7 +147,7 @@ def score_methodology_summary(label: pd.Series) -> dict:
 def null_model_panel_summary(residuals: pd.DataFrame, region_id: str) -> dict:
     subset = residuals[residuals["region_id"].astype(str) == str(region_id)]
     fallback = null_panel_status()
-    caveat = "A single matched-null z-score is insufficient without complementary null models."
+    caveat = "Promotion requires agreement across several appropriate null families; survival of one convenient null is insufficient."
     if subset.empty:
         return {
             "status": fallback["status"],
@@ -162,6 +162,9 @@ def null_model_panel_summary(residuals: pd.DataFrame, region_id: str) -> dict:
         "status": str(row.get("null_panel_status", "") or fallback["status"]),
         "available_null_models": [item for item in available.split(",") if item]
         or fallback["implemented_null_models"],
+        "null_model_count": int(row.get("null_model_count", 0) or 0),
+        "null_model_agreement": _finite_float(row.get("null_model_agreement")),
+        "null_model_conflict": _bool_field(row, "null_model_conflict"),
         "missing_or_partial_null_models": [item for item in missing.split(",") if item]
         or fallback["missing_or_partial_null_models"],
         "caveat": caveat,
@@ -173,6 +176,7 @@ def build_region_card(
     label: pd.Series,
     residuals: pd.DataFrame,
     features: pd.DataFrame | None = None,
+    architecture_candidates: pd.DataFrame | None = None,
 ) -> dict:
     region_id = str(window["region_id"])
     primitive = str(label.get("primitive_class", "unexplained_dark_anomaly_candidate"))
@@ -224,9 +228,44 @@ def build_region_card(
     negative_evidence = candidate_negative_evidence(
         artifact_risk_flags=artifact_risk_flags,
         null_panel_status=str(null_model_panel_summary(residuals, region_id).get("status", "")),
+        survives_severe_nulls=(
+            bool(label.get("survives_severe_null_panel"))
+            if pd.notna(label.get("survives_severe_null_panel", np.nan))
+            else None
+        ),
         window_shift_status=window_shift_status,
         bridge_status=str(mechanistic_bridge.get("bridge_status", "")),
     )
+    architecture_row = None
+    if architecture_candidates is not None and not architecture_candidates.empty:
+        direct = architecture_candidates.loc[architecture_candidates["region_id"].astype(str) == region_id]
+        if direct.empty and "source_representative_region_id" in architecture_candidates.columns:
+            direct = architecture_candidates.loc[
+                architecture_candidates["source_representative_region_id"].astype(str) == region_id
+            ]
+        if not direct.empty:
+            architecture_row = direct.iloc[0]
+    analysis_modes = ["Mode_A_sequence_specific"]
+    mode_b_summary = {
+        "status": "unavailable_not_run",
+        "reason": "Mode B was disabled or no matching interval-level result was available.",
+    }
+    if architecture_row is not None:
+        analysis_modes.append("Mode_B_sequence_indifferent")
+        mode_b_summary = {
+            "status": str(architecture_row.get("mode_b_score_status", "available")),
+            "sequence_indifferent_candidate": str(architecture_row.get("sequence_indifferent_candidate", "unresolved_architecture_candidate")),
+            "dominant_mode": str(architecture_row.get("dominant_mode", "unresolved")),
+            "sequence_identity_sensitivity": _finite_float(architecture_row.get("sequence_identity_sensitivity")),
+            "length_sensitivity": _finite_float(architecture_row.get("length_sensitivity")),
+            "copy_number_sensitivity": _finite_float(architecture_row.get("copy_number_sensitivity")),
+            "spacing_sensitivity": _finite_float(architecture_row.get("spacing_null_zscore")),
+            "sequence_indifference_score": _finite_float(architecture_row.get("sequence_indifference_score")),
+            "architecture_null_zscore": _finite_float(architecture_row.get("architecture_null_zscore")),
+            "architecture_null_status": str(architecture_row.get("architecture_null_status", "")),
+            "promotion_status": str(architecture_row.get("promotion_status", "screening_only_not_for_promotion")),
+            "evidence_scope": "model_based_perturbation_and_quantity_screen_not_biological_causality",
+        }
     card = {
         "region_id": region_id,
         "coordinates": f"{window.get('chrom')}:{int(window.get('start'))}-{int(window.get('end'))}",
@@ -236,6 +275,15 @@ def build_region_card(
             "child_region_ids": window.get("child_region_ids"),
         },
         "primitive_class": primitive,
+        "analysis_modes": analysis_modes,
+        "sequence_specific_candidate": primitive,
+        "sequence_indifferent_architecture": mode_b_summary,
+        "sequence_indifferent_candidate": mode_b_summary.get("sequence_indifferent_candidate", "unavailable"),
+        "dominant_mode": mode_b_summary.get("dominant_mode", "Mode_A"),
+        "sequence_identity_sensitivity": mode_b_summary.get("sequence_identity_sensitivity"),
+        "length_sensitivity": mode_b_summary.get("length_sensitivity"),
+        "copy_number_sensitivity": mode_b_summary.get("copy_number_sensitivity"),
+        "spacing_sensitivity": mode_b_summary.get("spacing_sensitivity"),
         "candidate_only": True,
         "candidate_statement": "This is a sequence-derived candidate hypothesis, not a confirmed biological primitive.",
         "terminology_scope": TERMINOLOGY_SCOPE,
@@ -244,6 +292,14 @@ def build_region_card(
         "null_model_panel": null_model_panel_summary(residuals, region_id),
         "negative_evidence": negative_evidence,
         "candidate_support_status": negative_evidence["candidate_status"],
+        "candidate_promotion_status": str(
+            label.get("candidate_promotion_status", "screening_only_legacy_null_metadata_unavailable")
+        ),
+        "survives_severe_null_panel": (
+            bool(label.get("survives_severe_null_panel"))
+            if pd.notna(label.get("survives_severe_null_panel", np.nan))
+            else None
+        ),
         "confirmed_name": ontology.confirmed_name,
         "requires_dynamic_validation": bool(ontology.requires_dynamic_data),
         "required_validation_data": ontology.required_input_level,
@@ -271,7 +327,11 @@ def build_region_card(
         "residualization_summary": resid_summary,
         "classical_covariates_controlled": controlled,
         "nearest_classical_explanation": "Review TE/repeat/GC/mappability/gene-proximity covariates before prioritization.",
-        "why_not_classical": "Candidate remains prioritized by residual and matched-null evidence after available classical covariate controls.",
+        "why_not_classical": (
+            "Candidate remains prioritized after classical covariate control and agrees across the configured severe null panel."
+            if bool(label.get("survives_severe_null_panel", False))
+            else "Candidate remains a screening hypothesis after classical covariate control; severe null support is incomplete or conflicting."
+        ),
         "predicted_hidden_property": ontology.description,
         "what_standard_assays_may_miss": "Static annotation or gene-centric assays may miss sequence-intrinsic perturbation interactions.",
         "recommended_primitive_assay": assay.get("assay"),
@@ -304,6 +364,7 @@ def make_region_cards(
     labels: pd.DataFrame,
     residuals: pd.DataFrame,
     features: pd.DataFrame | None = None,
+    architecture_candidates: pd.DataFrame | None = None,
     top_n: int | None = None,
     *,
     progress: bool = False,
@@ -318,7 +379,13 @@ def make_region_cards(
         reporter.start("building assay cards")
     for idx, row in enumerate(merged.iterrows(), start=1):
         record = row[1]
-        card = build_region_card(record, record, residuals, features=features)
+        card = build_region_card(
+            record,
+            record,
+            residuals,
+            features=features,
+            architecture_candidates=architecture_candidates,
+        )
         cards.append(card)
         if reporter:
             reporter.update(idx, message=str(record.get("region_id", "")))
@@ -339,6 +406,9 @@ def write_region_cards(cards: list[dict], outdir: str | Path) -> dict[str, Path]
                 "region_id": c["region_id"],
                 "coordinates": c["coordinates"],
                 "primitive_class": c["primitive_class"],
+                "analysis_modes": ";".join(c.get("analysis_modes", [])),
+                "sequence_indifferent_candidate": c.get("sequence_indifferent_candidate", "unavailable"),
+                "dominant_mode": c.get("dominant_mode", "Mode_A"),
                 "primitive_confidence": c["primitive_confidence"],
                 "artifact_risk_flags": c["artifact_risk_flags"],
                 "feature_hypothesis_boundary": c["feature_hypothesis_boundary"],

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import gzip
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -10,9 +11,14 @@ from typing import Optional
 import pandas as pd
 import typer
 
+from darkdna.architecture.comparison import compare_sequence_vs_quantity
+from darkdna.architecture.pipeline import run_sequence_indifferent_architecture, write_architecture_outputs
+from darkdna.benchmarks.default_state import benchmark_default_state, write_default_state_benchmark
+from darkdna.evolutionary_null import build_evolutionary_null_scores, write_evolutionary_null_outputs
 from darkdna.features.sequence import extract_features_for_windows, write_sequence_features
 from darkdna.features.te_grammar import annotate_te_grammar
 from darkdna.io.gff import read_te_annotation
+from darkdna.io.fasta import read_fasta
 from darkdna.primitives.labeler import assign_primitive_labels, write_primitive_labels
 from darkdna.reports.genome_browser_tracks import make_tracks as write_tracks
 from darkdna.reports.html_report import generate_html_report
@@ -38,6 +44,60 @@ logger = get_logger()
 
 def read_table(path: str | Path) -> pd.DataFrame:
     p = Path(path)
+    if p.name.lower().endswith((".vcf", ".vcf.gz")):
+        header = None
+        opener = gzip.open if p.name.lower().endswith(".gz") else open
+        with opener(p, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("#CHROM"):
+                    header = line.rstrip("\n").lstrip("#").split("\t")
+                    break
+        if header is None:
+            raise ValueError(f"VCF header #CHROM was not found in {p}")
+        raw = pd.read_csv(p, sep="\t", comment="#", names=header, dtype=str)
+        rows: list[dict[str, object]] = []
+        sample_columns = header[9:] if len(header) > 9 else []
+        for _, record in raw.iterrows():
+            values = record.to_dict()
+            info = {
+                key: value
+                for item in str(values.get("INFO", "")).split(";")
+                if item
+                for key, value in [item.split("=", 1) if "=" in item else (item, "true")]
+            }
+            start = int(values["POS"]) - 1
+            end = int(info.get("END", start + max(1, abs(int(info.get("SVLEN", 1))))))
+            format_keys = str(values.get("FORMAT", "")).split(":") if values.get("FORMAT") else []
+            if sample_columns and "CN" in format_keys:
+                cn_index = format_keys.index("CN")
+                for sample in sample_columns:
+                    sample_values = str(values.get(sample, "")).split(":")
+                    copy_number_value = pd.to_numeric(
+                        pd.Series([sample_values[cn_index] if cn_index < len(sample_values) else None]),
+                        errors="coerce",
+                    ).iloc[0]
+                    rows.append(
+                        {
+                            "chrom": str(values["CHROM"]),
+                            "start": start,
+                            "end": end,
+                            "sample_id": sample,
+                            "copy_number": copy_number_value,
+                            "svtype": info.get("SVTYPE", ""),
+                        }
+                    )
+            else:
+                rows.append(
+                    {
+                        "chrom": str(values["CHROM"]),
+                        "start": start,
+                        "end": end,
+                        "sample_id": "reference",
+                        "copy_number": pd.to_numeric(pd.Series([info.get("CN")]), errors="coerce").iloc[0],
+                        "svtype": info.get("SVTYPE", ""),
+                    }
+                )
+        return pd.DataFrame(rows)
     if p.suffix == ".parquet":
         return pd.read_parquet(p)
     if p.suffix in {".tsv", ".bed", ".bedGraph"}:
@@ -60,6 +120,88 @@ def require_configured_path(value: Path | None, label: str) -> Path:
     if value is None:
         raise typer.BadParameter(f"{label} is required unless supplied by --config")
     return value
+
+
+def optional_nested_path(config_path: Path | None, value: str | Path | None) -> Path | None:
+    path = resolve_config_path(config_path, value)
+    if path is None:
+        return None
+    if not path.exists():
+        logger.warning("Optional input is unavailable and its stage will be marked unavailable: %s", path)
+        return None
+    return path
+
+
+def optional_table(path: Path | None) -> pd.DataFrame | None:
+    return read_table(path) if path is not None and path.exists() else None
+
+
+def interval_sequences(intervals: pd.DataFrame, fasta: Path) -> tuple[dict[str, str], dict[str, str]]:
+    genome = read_fasta(fasta)
+    sequences: dict[str, str] = {}
+    for _, row in intervals.iterrows():
+        region_id = str(row.get("region_id", row.get("locus_id", f"{row['chrom']}:{int(row['start'])}-{int(row['end'])}")))
+        sequences[region_id] = genome.get(str(row["chrom"]), "")[int(row["start"]) : int(row["end"])]
+    return sequences, genome
+
+
+def run_mode_b_from_config(
+    config_path: Path,
+    cfg,
+    outdir: Path,
+    *,
+    intervals_path: Path | None = None,
+    mode_a_path: Path | None = None,
+) -> dict[str, Path]:
+    sources = cfg.sequence_indifferent.interval_sources
+    configured_intervals = optional_nested_path(config_path, sources.candidate_loci)
+    intervals_path = intervals_path or configured_intervals or outdir / "candidate_loci.parquet"
+    if not intervals_path.exists():
+        intervals_path = outdir / "dark_windows.parquet"
+    intervals = read_table(intervals_path)
+    if "region_id" not in intervals.columns and "locus_id" in intervals.columns:
+        intervals["region_id"] = intervals["locus_id"].astype(str)
+    fasta = require_configured_path(cfg_path(config_path, cfg, "fasta"), "FASTA")
+    sequences, genome = interval_sequences(intervals, fasta)
+    repeats_path = optional_nested_path(config_path, sources.repeats) or cfg_path(config_path, cfg, "te_annotation")
+    repeats = read_te_annotation(repeats_path) if repeats_path is not None and repeats_path.exists() else None
+    copy_path = optional_nested_path(config_path, sources.copy_number) or optional_nested_path(config_path, sources.structural_variants)
+    presence_path = optional_nested_path(config_path, sources.presence_absence)
+    synteny_path = optional_nested_path(config_path, sources.syntenic_intervals)
+    anchors_path = optional_nested_path(config_path, sources.anchors)
+    occupancy_path = optional_nested_path(config_path, sources.chromatin_compartments)
+    heterochromatin_path = optional_nested_path(config_path, sources.heterochromatin)
+    replication_path = optional_nested_path(config_path, sources.replication_timing)
+    phenotype_path = optional_nested_path(config_path, cfg.sequence_indifferent.phenotype_table)
+    mode_a_path = mode_a_path or outdir / "candidate_loci.parquet"
+    mode_a = read_table(mode_a_path) if mode_a_path.exists() else pd.DataFrame()
+    results = run_sequence_indifferent_architecture(
+        intervals,
+        sequences=sequences,
+        mode_a=mode_a,
+        repeats=repeats,
+        copy_number=optional_table(copy_path),
+        presence_absence=optional_table(presence_path),
+        syntenic_intervals=optional_table(synteny_path),
+        anchors=optional_table(anchors_path),
+        occupancy=optional_table(occupancy_path),
+        heterochromatin=optional_table(heterochromatin_path),
+        replication_domains=optional_table(replication_path),
+        phenotype=optional_table(phenotype_path),
+        genome_sizes={chrom: len(sequence) for chrom, sequence in genome.items()},
+        seed=cfg.random_seed,
+        kmer_size=cfg.sequence_indifferent.kmer_size,
+        block_size_bp=cfg.null_models.block_size_bp,
+        minimum_independent_blocks=cfg.null_models.minimum_independent_blocks,
+    )
+    paths = write_architecture_outputs(results, outdir)
+    write_provenance(
+        outdir,
+        "darkdna score-sequence-indifferent-architecture",
+        cfg,
+        [intervals_path, fasta, repeats_path, copy_path, presence_path, synteny_path, anchors_path],
+    )
+    return paths
 
 
 PIPELINE_STAGE_NAMES = [
@@ -154,11 +296,59 @@ def run_config_pipeline(
 
     stage += 1
     progress_message("pipeline", f"stage {stage}/{len(PIPELINE_STAGE_NAMES)} {PIPELINE_STAGE_NAMES[stage - 1]}")
-    nulls_df = build_matched_null_models(scores_df, features_df, n_controls=cfg.n_null, progress=True)
+    null_feature_table = features_df.merge(
+        windows_df[[column for column in windows_df.columns if column not in features_df.columns or column == "region_id"]],
+        on="region_id",
+        how="left",
+    )
+    nulls_df = build_matched_null_models(
+        scores_df,
+        null_feature_table,
+        n_controls=cfg.null_models.n_controls or cfg.n_null,
+        block_size_bp=cfg.null_models.block_size_bp,
+        minimum_independent_blocks=cfg.null_models.minimum_independent_blocks,
+        agreement_z_threshold=cfg.null_models.agreement_z_threshold,
+        progress=True,
+    )
     null_path = write_matched_nulls(nulls_df, outdir)
     write_provenance(outdir, "darkdna run: build-null-models", cfg, [score_path, feature_path])
     logger.info("Wrote matched null summaries to %s", null_path)
     pipeline.update(stage, message=f"null_rows={len(nulls_df)}", force=True)
+
+    if cfg.evolution.evolutionary_null_enabled:
+        progress_message("pipeline", "optional stage build-evolutionary-nulls")
+        genome = read_fasta(require_configured_path(fasta, "FASTA"))
+        evolutionary_sequences = {
+            str(row.region_id): genome.get(str(row.chrom), "")[int(row.start) : int(row.end)]
+            for row in windows_df.itertuples()
+        }
+        mutation_path = optional_nested_path(config, cfg.evolution.mutation_spectrum)
+        evolutionary_scores, evolutionary_model = build_evolutionary_null_scores(
+            evolutionary_sequences,
+            n_surrogates=cfg.evolution.n_surrogates,
+            seed=cfg.random_seed,
+            mutation_table=optional_table(mutation_path),
+        )
+        evolutionary_paths = write_evolutionary_null_outputs(evolutionary_scores, evolutionary_model, outdir)
+        write_provenance(outdir, "darkdna run: build-evolutionary-nulls", cfg, [fasta, mutation_path])
+        logger.info("Wrote evolutionary null scores to %s", evolutionary_paths["scores"])
+
+    if cfg.default_state_benchmark.enabled:
+        progress_message("pipeline", "optional stage benchmark-default-state")
+        benchmark_results = benchmark_default_state(
+            read_fasta(require_configured_path(fasta, "FASTA")),
+            windows_df,
+            seed=cfg.random_seed,
+            max_windows=cfg.default_state_benchmark.max_windows,
+            local_block_size=cfg.default_state_benchmark.local_block_size,
+            kmer_size=cfg.default_state_benchmark.kmer_size,
+            configured_foundation_models=cfg.default_state_benchmark.foundation_model_paths,
+            repeat_intervals=read_te_annotation(te_annotation) if te_annotation else None,
+            te_annotations=read_te_annotation(te_annotation) if te_annotation else None,
+        )
+        benchmark_paths = write_default_state_benchmark(benchmark_results, outdir)
+        write_provenance(outdir, "darkdna run: benchmark-default-state", cfg, [fasta, window_paths["parquet"]])
+        logger.info("Wrote native-versus-random benchmark to %s", benchmark_paths["html"])
 
     stage += 1
     progress_message("pipeline", f"stage {stage}/{len(PIPELINE_STAGE_NAMES)} {PIPELINE_STAGE_NAMES[stage - 1]}")
@@ -188,9 +378,24 @@ def run_config_pipeline(
     logger.info("Wrote locus-level candidate aggregation to %s", locus_paths["candidate_loci_parquet"])
     pipeline.update(stage, message=f"labels={len(labels_df)}", force=True)
 
+    architecture_candidates = pd.DataFrame()
+    if cfg.analysis_modes.sequence_indifferent.enabled:
+        progress_message("pipeline", "optional stage Mode B sequence-indifferent architecture")
+        architecture_paths = run_mode_b_from_config(config, cfg, outdir)
+        architecture_candidates = read_table(architecture_paths["architecture_candidates"])
+        logger.info("Wrote Mode B architecture candidates to %s", architecture_paths["architecture_candidates"])
+
     stage += 1
     progress_message("pipeline", f"stage {stage}/{len(PIPELINE_STAGE_NAMES)} {PIPELINE_STAGE_NAMES[stage - 1]}")
-    cards = make_region_cards(windows_df, labels_df, residuals_df, features_df, top_n=top_n_cards, progress=True)
+    cards = make_region_cards(
+        windows_df,
+        labels_df,
+        residuals_df,
+        features_df,
+        architecture_candidates=architecture_candidates,
+        top_n=top_n_cards,
+        progress=True,
+    )
     card_paths = write_region_cards(cards, outdir)
     write_negative_evidence([{"region_id": card["region_id"], **card["negative_evidence"]} for card in cards], outdir)
     write_provenance(outdir, "darkdna run: make-region-cards", cfg, [window_paths["parquet"], label_path, residual_paths["residuals"], feature_path])
@@ -332,6 +537,14 @@ def score_primitives_cmd(
     outdir = cfg_outdir(config, cfg, outdir)
     features = features or outdir / "sequence_features.parquet"
     feature_table = read_table(features)
+    windows_path = outdir / "dark_windows.parquet"
+    if windows_path.exists():
+        windows_table = read_table(windows_path)
+        feature_table = feature_table.merge(
+            windows_table[[column for column in windows_table.columns if column not in feature_table.columns or column == "region_id"]],
+            on="region_id",
+            how="left",
+        )
     scores = score_primitives(feature_table, progress=True)
     path = write_primitive_scores(scores, outdir)
     write_provenance(outdir, "darkdna score-primitives", cfg, [features])
@@ -353,10 +566,125 @@ def build_null_models_cmd(
     n_controls = n_controls if n_controls is not None else cfg.n_null
     score_table = read_table(scores)
     feature_table = read_table(features)
-    nulls = build_matched_null_models(score_table, feature_table, n_controls=n_controls, progress=True)
+    nulls = build_matched_null_models(
+        score_table,
+        feature_table,
+        n_controls=n_controls,
+        block_size_bp=cfg.null_models.block_size_bp,
+        minimum_independent_blocks=cfg.null_models.minimum_independent_blocks,
+        agreement_z_threshold=cfg.null_models.agreement_z_threshold,
+        progress=True,
+    )
     path = write_matched_nulls(nulls, outdir)
     write_provenance(outdir, "darkdna build-null-models", cfg, [scores, features])
     logger.info("Wrote matched null summaries to %s", path)
+
+
+@app.command("build-evolutionary-nulls")
+def build_evolutionary_nulls_cmd(
+    config: Path = typer.Option(..., "--config", "-c", help="YAML config."),
+    windows: Optional[Path] = typer.Option(None, help="Window/interval table."),
+    outdir: Optional[Path] = typer.Option(None, help="Output directory."),
+    n_surrogates: Optional[int] = typer.Option(None, help="Neutral surrogates per interval."),
+) -> None:
+    cfg = load_config(config)
+    outdir = cfg_outdir(config, cfg, outdir)
+    fasta = require_configured_path(cfg_path(config, cfg, "fasta"), "FASTA")
+    windows = windows or outdir / "dark_windows.parquet"
+    interval_table = read_table(windows)
+    sequences, _ = interval_sequences(interval_table, fasta)
+    mutation_path = optional_nested_path(config, cfg.evolution.mutation_spectrum)
+    scores, model = build_evolutionary_null_scores(
+        sequences,
+        n_surrogates=n_surrogates or cfg.evolution.n_surrogates,
+        seed=cfg.random_seed,
+        mutation_table=optional_table(mutation_path),
+    )
+    paths = write_evolutionary_null_outputs(scores, model, outdir)
+    write_provenance(outdir, "darkdna build-evolutionary-nulls", cfg, [fasta, windows, mutation_path])
+    logger.info("Wrote evolutionary null scores to %s", paths["scores"])
+
+
+@app.command("benchmark-default-state")
+def benchmark_default_state_cmd(
+    config: Path = typer.Option(..., "--config", "-c", help="YAML config."),
+    windows: Optional[Path] = typer.Option(None, help="Window table."),
+    outdir: Optional[Path] = typer.Option(None, help="Output directory."),
+    max_windows: Optional[int] = typer.Option(None, help="Deterministic maximum number of windows."),
+) -> None:
+    cfg = load_config(config)
+    outdir = cfg_outdir(config, cfg, outdir)
+    fasta = require_configured_path(cfg_path(config, cfg, "fasta"), "FASTA")
+    windows = windows or outdir / "dark_windows.parquet"
+    results = benchmark_default_state(
+        read_fasta(fasta),
+        read_table(windows),
+        seed=cfg.random_seed,
+        max_windows=max_windows or cfg.default_state_benchmark.max_windows,
+        local_block_size=cfg.default_state_benchmark.local_block_size,
+        kmer_size=cfg.default_state_benchmark.kmer_size,
+        configured_foundation_models=cfg.default_state_benchmark.foundation_model_paths,
+        repeat_intervals=read_te_annotation(cfg_path(config, cfg, "te_annotation")) if cfg_path(config, cfg, "te_annotation") else None,
+        te_annotations=read_te_annotation(cfg_path(config, cfg, "te_annotation")) if cfg_path(config, cfg, "te_annotation") else None,
+    )
+    paths = write_default_state_benchmark(results, outdir)
+    write_provenance(outdir, "darkdna benchmark-default-state", cfg, [fasta, windows])
+    logger.info("Wrote native-versus-random benchmark to %s", paths["html"])
+
+
+@app.command("extract-architecture-features")
+def extract_architecture_features_cmd(
+    config: Path = typer.Option(..., "--config", "-c", help="YAML config."),
+    intervals: Optional[Path] = typer.Option(None, help="Candidate loci or interval table."),
+    outdir: Optional[Path] = typer.Option(None, help="Output directory."),
+) -> None:
+    cfg = load_config(config)
+    outdir = cfg_outdir(config, cfg, outdir)
+    paths = run_mode_b_from_config(config, cfg, outdir, intervals_path=intervals)
+    logger.info("Wrote Mode B architecture features to %s", paths["architecture_features"])
+
+
+@app.command("score-sequence-indifferent-architecture")
+def score_sequence_indifferent_architecture_cmd(
+    config: Path = typer.Option(..., "--config", "-c", help="YAML config."),
+    intervals: Optional[Path] = typer.Option(None, help="Candidate loci or interval table."),
+    outdir: Optional[Path] = typer.Option(None, help="Output directory."),
+) -> None:
+    cfg = load_config(config)
+    outdir = cfg_outdir(config, cfg, outdir)
+    paths = run_mode_b_from_config(config, cfg, outdir, intervals_path=intervals)
+    logger.info("Wrote Mode B scores to %s", paths["architecture_candidates"])
+
+
+@app.command("compare-sequence-vs-quantity")
+def compare_sequence_vs_quantity_cmd(
+    mode_a: Optional[Path] = typer.Option(None, help="Mode A residual or locus table."),
+    mode_b: Optional[Path] = typer.Option(None, help="Mode B candidate table."),
+    outdir: Optional[Path] = typer.Option(None, help="Output directory."),
+    config: Optional[Path] = typer.Option(None, help="YAML config."),
+) -> None:
+    cfg = load_config(config)
+    outdir = cfg_outdir(config, cfg, outdir)
+    mode_a = mode_a or outdir / "residual_scores.parquet"
+    mode_b = mode_b or outdir / "architecture_candidates.parquet"
+    comparison = compare_sequence_vs_quantity(read_table(mode_a), read_table(mode_b))
+    path = outdir / "sequence_vs_quantity_scores.parquet"
+    outdir.mkdir(parents=True, exist_ok=True)
+    comparison.to_parquet(path, index=False)
+    write_provenance(outdir, "darkdna compare-sequence-vs-quantity", cfg, [mode_a, mode_b])
+    logger.info("Wrote separate Mode A/Mode B axes to %s", path)
+
+
+@app.command("infer-architecture-candidates")
+def infer_architecture_candidates_cmd(
+    config: Path = typer.Option(..., "--config", "-c", help="YAML config."),
+    intervals: Optional[Path] = typer.Option(None, help="Candidate loci or interval table."),
+    outdir: Optional[Path] = typer.Option(None, help="Output directory."),
+) -> None:
+    cfg = load_config(config)
+    outdir = cfg_outdir(config, cfg, outdir)
+    paths = run_mode_b_from_config(config, cfg, outdir, intervals_path=intervals)
+    logger.info("Wrote candidate-only Mode B classifications to %s", paths["architecture_candidates"])
 
 
 @app.command()
@@ -430,6 +758,7 @@ def make_region_cards_cmd(
     labels: Optional[Path] = typer.Option(None, help="Primitive labels table."),
     residuals: Optional[Path] = typer.Option(None, help="Residual score table."),
     features: Optional[Path] = typer.Option(None, help="Feature table."),
+    architecture_candidates: Optional[Path] = typer.Option(None, help="Optional Mode B architecture candidates."),
     outdir: Optional[Path] = typer.Option(None, help="Output directory."),
     top_n: Optional[int] = typer.Option(None, help="Limit number of cards."),
     config: Optional[Path] = typer.Option(None, help="YAML config."),
@@ -444,7 +773,17 @@ def make_region_cards_cmd(
     label_table = read_table(labels)
     residual_table = read_table(residuals)
     feature_table = read_table(features) if features else pd.DataFrame()
-    cards = make_region_cards(window_table, label_table, residual_table, feature_table, top_n=top_n, progress=True)
+    architecture_path = architecture_candidates or outdir / "architecture_candidates.parquet"
+    architecture_table = read_table(architecture_path) if architecture_path.exists() else pd.DataFrame()
+    cards = make_region_cards(
+        window_table,
+        label_table,
+        residual_table,
+        feature_table,
+        architecture_candidates=architecture_table,
+        top_n=top_n,
+        progress=True,
+    )
     paths = write_region_cards(cards, outdir)
     write_negative_evidence([{"region_id": card["region_id"], **card["negative_evidence"]} for card in cards], outdir)
     write_provenance(outdir, "darkdna make-region-cards", cfg, [windows, labels, residuals, features])

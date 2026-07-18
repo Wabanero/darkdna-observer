@@ -14,3 +14,42 @@ primitive_thresholds:
   residual_zscore: 2.0
   matched_null_zscore: 2.0
   confidence_high: 0.75
+analysis_modes:
+  sequence_specific: {enabled: true}
+  sequence_indifferent: {enabled: false}
+  evolution: {enabled: false}
+sequence_indifferent:
+  analysis_levels:
+    window: true
+    locus: true
+    repeat_family: true
+    chromosome: false
+    genome: false
+  interval_sources:
+    candidate_loci: null
+    repeats: null
+    copy_number: null
+    structural_variants: null
+    presence_absence: null
+    syntenic_intervals: null
+    anchors: null
+    chromatin_compartments: null
+    heterochromatin: null
+    replication_timing: null
+  phenotype_table: null
+  transformation_replicates: 5
+  kmer_size: 3
+evolution:
+  evolutionary_null_enabled: false
+  mutation_spectrum: null
+  n_surrogates: 25
+null_models:
+  block_size_bp: 100000
+  minimum_independent_blocks: 5
+  agreement_z_threshold: 2.0
+default_state_benchmark:
+  enabled: false
+  max_windows: 256
+  local_block_size: 1000
+  kmer_size: 3
+  foundation_model_paths: {}

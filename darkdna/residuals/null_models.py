@@ -15,6 +15,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from darkdna.nulls.calibration import build_severe_null_panel
+from darkdna.nulls.registry import assess_null_availability, null_model_registry as severe_null_model_registry
 from darkdna.utils.progress import ProgressReporter
 from darkdna.utils.stats import empirical_p_value
 from darkdna.views.primitive_scores import PRIMITIVE_SCORE_COLUMNS
@@ -90,16 +92,27 @@ NULL_MODEL_REGISTRY: list[dict[str, str]] = [
 
 
 def null_model_registry() -> list[dict[str, str]]:
-    return [dict(item) for item in NULL_MODEL_REGISTRY]
+    severe = [dict(item) for item in severe_null_model_registry()]
+    severe.append(
+        {
+            "null_model_id": "matched_controls_v1",
+            "family": "legacy_alias",
+            "execution_mode": "matched_table",
+            "required_columns": [],
+            "required_input": "",
+            "description": "Deprecated compatibility alias for the earlier single matched-control implementation.",
+            "status": "deprecated_alias",
+        }
+    )
+    return severe
 
 
 def null_panel_status() -> dict:
-    implemented = [item["null_model_id"] for item in NULL_MODEL_REGISTRY if item["status"] == "implemented"]
-    not_fully_implemented = [
-        item["null_model_id"]
-        for item in NULL_MODEL_REGISTRY
-        if item["status"] != "implemented"
-    ]
+    assessed = assess_null_availability(())
+    implemented = ["matched_controls_v1"]
+    not_fully_implemented = [str(item["null_model_id"]) for item in assessed if not item["available"]]
+    if "syntenic_ortholog_controls" not in not_fully_implemented:
+        not_fully_implemented.append("syntenic_ortholog_controls")
     return {
         "status": "insufficient_single_matched_null_until_complementary_nulls_pass",
         "implemented_null_models": implemented,
@@ -209,75 +222,44 @@ def build_matched_null_models(
     features: pd.DataFrame | None = None,
     n_controls: int = 25,
     *,
+    block_size_bp: int = 100_000,
+    minimum_independent_blocks: int = 5,
+    agreement_z_threshold: float = 2.0,
     progress: bool = False,
 ) -> pd.DataFrame:
     features = features if features is not None and not features.empty else scores[["region_id"]].copy()
     if "region_id" not in features.columns:
         features = scores[["region_id"]].copy()
-    merged_scores = scores.set_index("region_id")
-    rows = []
-    available_score_cols = [col for col in PRIMITIVE_SCORE_COLUMNS if col in scores.columns]
-    region_ids = scores["region_id"].astype(str).tolist()
-    reporter = ProgressReporter("build-null-models", total=len(region_ids)) if progress else None
+    reporter = ProgressReporter("build-null-models", total=1) if progress else None
     if reporter:
-        reporter.start(f"matching controls n_controls={n_controls}")
-    panel_status = null_panel_status()
-    missing_or_partial = panel_status["missing_or_partial_null_models"]
-    for idx, region_id in enumerate(region_ids, start=1):
-        controls = select_matched_controls(features, region_id, n=n_controls)
-        if controls.empty:
-            controls = features.loc[features["region_id"].astype(str) != region_id]
-        control_ids = [rid for rid in controls["region_id"].astype(str).tolist() if rid in merged_scores.index]
-        for primitive in available_score_cols:
-            observed = float(merged_scores.loc[region_id, primitive])
-            null_values = merged_scores.loc[control_ids, primitive].astype(float).to_numpy() if control_ids else np.array([], dtype=float)
-            null_values = null_values[np.isfinite(null_values)]
-            null_mean = float(np.mean(null_values)) if null_values.size else np.nan
-            null_std = float(np.std(null_values, ddof=1)) if null_values.size > 1 else 0.0
-            null_z = np.nan if null_std == 0 or not np.isfinite(null_std) else (observed - null_mean) / null_std
-            if null_values.size:
-                p_value = empirical_p_value(observed, null_values, higher=True)
-                p_status = "available_explicit_matched_control_null"
-                p_reason = "One-sided empirical tail under matched_controls_v1 with the +1 finite-sample correction."
-            else:
-                p_value = np.nan
-                p_status = "unavailable"
-                p_reason = "No distinct matched control regions were available; observed genomic ranks were not substituted as a null."
-            available_models = ["matched_controls_v1"] if null_values.size else []
-            rows.append(
-                {
-                    "null_model_id": "matched_controls_v1",
-                    "region_id": region_id,
-                    "primitive": primitive,
-                    "primitive_score": observed,
-                    "null_mean": null_mean,
-                    "null_std": null_std,
-                    "null_zscore": float(null_z),
-                    "null_sample_size": int(null_values.size),
-                    "empirical_p_value": float(p_value),
-                    "empirical_p_value_status": p_status,
-                    "empirical_p_value_reason": p_reason,
-                    "empirical_p_value_tail": "higher",
-                    "matched_features_used": ",".join(matched_feature_columns(features)),
-                    "null_panel_status": panel_status["status"],
-                    "available_null_models": ",".join(available_models),
-                    "missing_or_partial_null_models": ",".join(missing_or_partial),
-                }
-            )
-        if reporter:
-            reporter.update(idx, message=region_id)
+        reporter.start(f"severe block-aware panel n_controls={n_controls}")
+    summary, details = build_severe_null_panel(
+        scores,
+        features,
+        n_controls=n_controls,
+        block_size_bp=block_size_bp,
+        minimum_independent_blocks=minimum_independent_blocks,
+        agreement_z_threshold=agreement_z_threshold,
+        score_columns=[column for column in PRIMITIVE_SCORE_COLUMNS if column in scores.columns],
+    )
+    summary.attrs["null_details"] = details
     if reporter:
-        reporter.finish()
-    return pd.DataFrame(rows)
+        reporter.finish(f"summary_rows={len(summary)} detail_rows={len(details)}")
+    return summary
 
 
 def write_matched_nulls(nulls: pd.DataFrame, outdir: str | Path) -> Path:
     out = Path(outdir)
     out.mkdir(parents=True, exist_ok=True)
     path = out / "matched_nulls.parquet"
-    nulls.to_parquet(path, index=False)
+    details = nulls.attrs.get("null_details")
+    serializable_nulls = nulls.copy()
+    serializable_nulls.attrs = {}
+    serializable_nulls.to_parquet(path, index=False)
     alias = out / "null_model_summary.parquet"
-    nulls.to_parquet(alias, index=False)
+    serializable_nulls.to_parquet(alias, index=False)
+    if isinstance(details, pd.DataFrame):
+        details.to_parquet(out / "severe_null_details.parquet", index=False)
     registry_path = out / "null_model_registry.json"
     registry_path.write_text(json.dumps(null_model_registry(), indent=2), encoding="utf-8")
     return path

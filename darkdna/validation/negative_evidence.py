@@ -96,6 +96,7 @@ def candidate_negative_evidence(
     *,
     artifact_risk_flags: str = "",
     null_panel_status: str = "",
+    survives_severe_nulls: bool | None = None,
     window_shift_status: str = "",
     bridge_status: str = "",
 ) -> dict[str, Any]:
@@ -108,7 +109,9 @@ def candidate_negative_evidence(
         "assembly_collapse",
         "very_high_n_fraction",
     }
-    complete_null = null_panel_status in {"complete_severe_null_panel_passed", "available_multiple_severe_nulls"}
+    legacy_complete_null = null_panel_status in {"complete_severe_null_panel_passed", "available_multiple_severe_nulls"}
+    if survives_severe_nulls is None and legacy_complete_null:
+        survives_severe_nulls = True
     bridge_plausible = bridge_status not in {"bridge_missing_feature_audit_required", "missing", ""}
     window_stable: bool | None
     if window_shift_status == "available":
@@ -119,7 +122,7 @@ def candidate_negative_evidence(
         window_stable = None
     return evaluate_negative_evidence(
         {
-            "survives_severe_nulls": True if complete_null else None,
+            "survives_severe_nulls": survives_severe_nulls,
             "window_shift_stable": window_stable,
             "assembly_artifact_supported": bool(flags.intersection(assembly_flags)),
             "mechanistic_bridge_plausible": bridge_plausible,

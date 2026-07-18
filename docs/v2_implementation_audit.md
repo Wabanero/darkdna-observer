@@ -108,9 +108,30 @@ The current sequence-first inputs cannot establish selected biological function,
 
 Sequence anomaly, entropy, compression, motif presence, predicted shape, conservation, transcription, accessibility, binding, association, and reporter activity are individually insufficient for those claims.
 
-## Phase boundary
+## Phase 2 and Phase 3 implementation
 
-This change set implements Phase 1 only. The severe-null registry expansion/evolutionary generative null (Phase 2), Mode B (Phase 3), evidence tensor and life history (Phase 4), copy-level TE and conformation graph (Phase 5), RNA/hidden translation (Phase 6), dynamic validation (Phase 7), and Onion/default-state comparative benchmarks (Phase 8) remain explicitly deferred.
+Phase 2 adds a complete severe-null framework: a registry for every required
+family, input-dependent availability, block-aware matched calibration,
+candidate-level agreement/conflict fields, deterministic sequence transforms, a
+reference-conditioned evolutionary-process simulator, and a native-versus-null
+benchmark whose result remains conditional on null definition. Foundation models
+are local-adapter-only and are never downloaded.
+
+Phase 3 adds first-class Mode B packages for amount, interval length, repeat
+burden, copy number, presence/absence, comparative length, spacing, occupancy,
+heterochromatic mass, sequence-indifference transformations, block-aware
+architecture nulls, candidate classification, Mode A/Mode B comparison, output
+manifests, CLI commands, region-card fields, and report sections. Mode B is
+disabled by default. Missing optional tracks generate explicit unavailable
+records rather than zero placeholders.
+
+## Current phase boundary
+
+The Function Evidence Tensor and Element Life-History model (Phase 4), copy-level
+TE and conformation graph (Phase 5), RNA/hidden translation (Phase 6), dynamic
+validation (Phase 7), and Onion/comparative multi-genome benchmark (Phase 8)
+remain deferred. The default-state native-versus-randomized component originally
+listed under the broader comparative roadmap is complete in Phase 2.
 
 ## Phase 1 verification
 

@@ -72,6 +72,8 @@ def assign_primitive_labels(
     windows: pd.DataFrame | None = None,
     residual_threshold: float = 2.0,
     matched_null_threshold: float = 2.0,
+    minimum_null_models_for_promotion: int = 3,
+    minimum_null_agreement_for_promotion: float = 0.5,
     *,
     progress: bool = False,
 ) -> pd.DataFrame:
@@ -87,6 +89,29 @@ def assign_primitive_labels(
         rz_value = best.get("residual_zscore", np.nan)
         rz = float(rz_value) if pd.notna(rz_value) and np.isfinite(float(rz_value)) else 0.0
         nz = float(best.get("matched_null_zscore", 0.0) if pd.notna(best.get("matched_null_zscore", np.nan)) else 0.0)
+        null_count_value = best.get("null_model_count", 0)
+        null_count = int(null_count_value) if pd.notna(null_count_value) else 0
+        agreement_value = best.get("null_model_agreement", np.nan)
+        null_agreement = float(agreement_value) if pd.notna(agreement_value) else np.nan
+        conflict_value = best.get("null_model_conflict", False)
+        null_conflict = bool(conflict_value) if pd.notna(conflict_value) else False
+        null_panel = str(best.get("null_panel_status", "") or "")
+        severe_null_support = bool(
+            null_panel == "severe_null_panel_available"
+            and null_count >= minimum_null_models_for_promotion
+            and np.isfinite(null_agreement)
+            and null_agreement >= minimum_null_agreement_for_promotion
+            and not null_conflict
+            and nz >= matched_null_threshold
+        )
+        if severe_null_support:
+            promotion_status = "eligible_for_candidate_promotion"
+        elif not null_panel:
+            promotion_status = "screening_only_legacy_null_metadata_unavailable"
+        elif null_conflict:
+            promotion_status = "screening_only_conflicting_null_families"
+        else:
+            promotion_status = "screening_only_insufficient_severe_null_support"
         if rz < residual_threshold and nz < matched_null_threshold:
             primitive = "unexplained_dark_anomaly_candidate" if float(group["residual_zscore"].max()) >= residual_threshold else "no_call"
         feature_row = feature_lookup.loc[region_id] if not feature_lookup.empty and region_id in feature_lookup.index else None
@@ -94,6 +119,8 @@ def assign_primitive_labels(
         flags = window_row.get("artifact_risk_flags", "") if window_row is not None else ""
         artifact_score = artifact_risk_score(flags)
         priority = max(0.0, min(1.0, (max(rz, 0.0) + max(nz, 0.0)) / 8.0)) * (1.0 - 0.35 * artifact_score)
+        if not severe_null_support:
+            priority *= 0.5
         supporting = _supporting_features(feature_row, primitive)
         rows.append(
             {
@@ -114,6 +141,12 @@ def assign_primitive_labels(
                     else np.nan
                 ),
                 "empirical_p_value_status": str(best.get("empirical_p_value_status", "")),
+                "null_panel_status": null_panel,
+                "null_model_count": null_count,
+                "null_model_agreement": null_agreement,
+                "null_model_conflict": null_conflict,
+                "survives_severe_null_panel": severe_null_support,
+                "candidate_promotion_status": promotion_status,
                 "top_supporting_features": ";".join(supporting),
                 "artifact_risk_flags": flags,
                 "recommended_assay": recommend_assay(primitive).get("assay", ""),

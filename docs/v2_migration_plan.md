@@ -49,7 +49,29 @@ Existing CLI commands and the default sequence-first pipeline remain public. Sci
 7. Count and test merged loci, not overlapping windows.
 8. Surface negative evidence and downgraded candidates in every downstream report.
 
-## Deferred CLI and schema migration
+## Phase 2 null migration
 
-The later v2 commands and nested Mode B–F configuration are not introduced in Phase 1. Adding command stubs that emit empty tables would violate the explicit-unavailable rule and create a misleading impression that those analyses exist. They will be added only with their required data validation, schemas, outputs, and tests in their scheduled phases.
+- `matched_controls_v1` remains a deprecated registry alias. Canonical candidate
+  summaries use `severe_null_panel_conservative_aggregate`.
+- Read `available_null_models`, `missing_null_models`, `null_model_count`,
+  `null_model_agreement`, and `null_model_conflict` before promotion.
+- `matched_null_zscore` now receives the conservative minimum survival z-score
+  across calibrated named table-based nulls. Detailed distributions are in
+  `severe_null_details.parquet`.
+- Sequence-transformation and evolutionary-process nulls are benchmark outputs;
+  they are not counted as candidate-level nulls unless actually run.
+- `matched_nulls.parquet` and `null_model_summary.parquet` remain compatibility
+  outputs.
 
+## Phase 3 Mode B migration
+
+- Mode B is disabled by default; the existing Mode A pipeline is unchanged.
+- Enable `analysis_modes.sequence_indifferent.enabled` or invoke a Mode B command.
+- `sequence_vs_quantity_scores.parquet` contains separate Mode A and Mode B
+  columns. There is no combined score.
+- Transformation sensitivities are model-based and not causal probabilities.
+- Missing optional tracks emit `NA`, an unavailable status, and a reason.
+- Region cards add Mode B fields only when a matching interval result exists.
+
+Phases 4–8 remain deferred until their data validation and negative-control
+contracts are implemented.

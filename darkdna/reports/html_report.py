@@ -71,6 +71,25 @@ REPORT_TEMPLATE = """<!doctype html>
   <h2>Top Residual Anomalies</h2>
   {{ top_residuals_html }}
 
+  <h2>Mode A — sequence-specific architecture</h2>
+  <p class="caveat">Mode A reports intrinsic sequence anomaly relative to explicit controls. It does not establish biological function.</p>
+  {{ mode_a_html }}
+
+  <h2>Mode B — sequence-indifferent architecture</h2>
+  <p class="caveat">Mode B asks whether amount, length, copy number, spacing, or occupancy may matter when exact nucleotide identity is replaceable. Model-based sensitivity is not biological causality.</p>
+  {{ mode_b_html }}
+
+  <h2>Sequence-specific versus quantity-dependent evidence</h2>
+  <p class="caveat">The axes remain separate; no universal DarkDNA score is calculated.</p>
+  {{ sequence_vs_quantity_html }}
+
+  <h2>Native-versus-randomized benchmark</h2>
+  <p class="caveat">Native excess depends on null definition and is not proof of selected function.</p>
+  {{ default_state_html }}
+
+  <h2>Evolutionary-process null benchmark</h2>
+  {{ evolutionary_null_html }}
+
   <h2>Rejected or downgraded candidates</h2>
   <p class="caveat">Decisive negative controls and artifact-compatible explanations are shown rather than hidden. Missing controls are insufficient evidence, not positive support.</p>
   {{ rejected_candidates_html }}
@@ -115,6 +134,9 @@ REPORT_TEMPLATE = """<!doctype html>
       {% endif %}
       {% if card.null_model_panel %}
       <p><strong>Null model panel:</strong> {{ card.null_model_panel.status }}. {{ card.null_model_panel.caveat }}</p>
+      {% endif %}
+      {% if card.sequence_indifferent_architecture %}
+      <p><strong>Mode B:</strong> {{ card.sequence_indifferent_architecture.status }}; candidate={{ card.sequence_indifferent_candidate }}; dominant mode={{ card.dominant_mode }}.</p>
       {% endif %}
       {% if card.negative_evidence %}
       <p><strong>Negative evidence:</strong> {{ card.negative_evidence.candidate_status }} / {{ card.negative_evidence.decision }}; decisive negatives={{ card.negative_evidence.decisive_negative_count }}.</p>
@@ -218,6 +240,14 @@ def generate_html_report(
             if card.get("negative_evidence", {}).get("decision") == "reject_or_downgrade"
         ]
     )
+    architecture_path = out / "architecture_candidates.parquet"
+    comparison_path = out / "sequence_vs_quantity_scores.parquet"
+    default_state_path = out / "native_vs_null_feature_shift.parquet"
+    evolutionary_path = out / "evolutionary_null_scores.parquet"
+    architecture = pd.read_parquet(architecture_path) if architecture_path.exists() else pd.DataFrame()
+    comparison = pd.read_parquet(comparison_path) if comparison_path.exists() else pd.DataFrame()
+    default_state = pd.read_parquet(default_state_path) if default_state_path.exists() else pd.DataFrame()
+    evolutionary = pd.read_parquet(evolutionary_path) if evolutionary_path.exists() else pd.DataFrame()
     html = Template(REPORT_TEMPLATE).render(
         project_name=project_name,
         input_summary=input_summary or {},
@@ -238,6 +268,23 @@ def generate_html_report(
         ),
         top_candidates_html=_table_html(top_candidates),
         top_residuals_html=_table_html(top_residuals),
+        mode_a_html=_table_html(top_candidates),
+        mode_b_html=_table_html(
+            architecture,
+            empty_message="Mode B was disabled or no architecture intervals were supplied.",
+        ),
+        sequence_vs_quantity_html=_table_html(
+            comparison,
+            empty_message="The Mode A–Mode B comparison was not run.",
+        ),
+        default_state_html=_table_html(
+            default_state,
+            empty_message="The native-versus-randomized benchmark was not run.",
+        ),
+        evolutionary_null_html=_table_html(
+            evolutionary,
+            empty_message="An evolutionary-process null was not configured.",
+        ),
         rejected_candidates_html=_table_html(rejected_candidates, empty_message="No candidate had decisive negative evidence in the supplied inputs."),
         negative_space_html=_table_html(negative),
         boundary_html=_table_html(boundary),

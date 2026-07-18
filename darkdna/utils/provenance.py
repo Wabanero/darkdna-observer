@@ -53,7 +53,7 @@ def write_provenance(
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "command": command,
         "darkdna_observer_version": __version__,
-        "scientific_method_contract": "v2_phase1",
+        "scientific_method_contract": "v2_phase3",
         "random_seed": config.random_seed,
         "input_file_checksums": checksums,
     }

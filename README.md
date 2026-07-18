@@ -220,11 +220,14 @@ Required null families include:
 - population-frequency, copy-number, or presence/absence controls
 - reversed or synthetic sequence controls
 
-The current implementation provides `matched_controls_v1` and helper functions
-for some sequence shuffles, but it does not yet run the full severe null panel.
-The pipeline therefore writes `null_model_registry.json`, and region cards carry
-`null_model_panel` so downstream users can see which null families are missing
-or only partially available.
+The Phase 2 implementation provides a machine-readable severe-null registry,
+block-aware calibration for every compatible matched-table family, deterministic
+sequence transformations, a reference-conditioned evolutionary-process null,
+and a native-versus-randomized benchmark. `null_model_registry.json` records
+every required family as available or unavailable with an explicit reason.
+Optional track-dependent nulls are never fabricated when their inputs are
+missing. Candidate summaries include null count, agreement, conflict, missing
+families, and a conservative aggregate p-value across calibrated named nulls.
 
 `classical_explanation_fraction` remains a deprecated compatibility alias for
 `classical_model_global_r2`. The value is model-level, can be negative under
@@ -235,8 +238,8 @@ cross-validation, and is not a per-region causal variance decomposition.
 The v2 design keeps six modes separate until an explicit evidence-integration
 stage:
 
-- Mode A — sequence-specific intrinsic architecture (the current implemented workflow)
-- Mode B — sequence-indifferent amount, length, copy, and spacing architecture (deferred to Phase 3)
+- Mode A — sequence-specific intrinsic architecture (implemented)
+- Mode B — sequence-indifferent amount, length, copy, spacing, occupancy, and heterochromatic-mass architecture (implemented as an optional candidate-only workflow)
 - Mode C — context-conditioned conformation and molecular state (deferred)
 - Mode D — transcription, RNA-product, and hidden-translation mechanisms (deferred)
 - Mode E — dynamic perturbation and state-transition evidence (deferred)
@@ -247,12 +250,35 @@ fitness, maintenance selection, origin selection, exaptation, selfish-element
 evidence, deleterious burden, and replication as separate axes. The planned
 Element Life-History model will separately represent birth, initial status,
 persistence, current status, and transitions. Neither is faked by placeholder
-zeros in Phase 1.
+zeros in the current release.
 
-Mode B will test whether DNA amount, length, copy number, spacing, or occupancy
-acts as a difference-maker when exact nucleotide identity is replaceable. Such
-an effect would not demonstrate that the DNA originated or is maintained by
-selection for that effect.
+Mode B tests whether DNA amount, length, copy number, spacing, or occupancy may
+act as a difference-maker when exact nucleotide identity is replaceable. It
+supports CNV/bedGraph tables, presence/absence matrices, syntenic interval
+lengths, anchor spacing, occupancy and heterochromatin tracks, equal-length
+replacement, length titration, and copy-number titration. These are separate
+evidence axes. Model-based perturbation sensitivity is not biological causality,
+and a quantity-dependent effect would not demonstrate that the DNA originated
+or is maintained by selection for that effect.
+
+Enable Mode B explicitly:
+
+```yaml
+analysis_modes:
+  sequence_specific: {enabled: true}
+  sequence_indifferent: {enabled: true}
+sequence_indifferent:
+  interval_sources:
+    candidate_loci: null  # defaults to candidate_loci.parquet from Mode A
+    copy_number: null
+    presence_absence: null
+    syntenic_intervals: null
+    anchors: null
+```
+
+New commands include `build-evolutionary-nulls`, `benchmark-default-state`,
+`extract-architecture-features`, `score-sequence-indifferent-architecture`,
+`compare-sequence-vs-quantity`, and `infer-architecture-candidates`.
 
 Phase 1 adds negative evidence as a first-class output. Missing controls produce
 `insufficient_evidence`; decisive artifacts, null explanations, powered negative
@@ -699,10 +725,11 @@ Named quantitative ATAC/RNA/ChIP signal-track ingestion is not yet a first-class
 workflow; those tracks still need explicit config support beyond the current
 mappability/signal helper utilities.
 
-Graph/pangenome coordinates, explicit copy-number tracks, presence/absence
-variation, lift-over chains, and assembly-confidence tables are not yet
-first-class inputs. Until they are, candidate interpretation should remain
-reference-scoped and assembly-caveated.
+Explicit copy-number tracks, presence/absence matrices, and syntenic interval
+tables are now optional first-class Mode B inputs. Graph/pangenome coordinates,
+lift-over chains, and general assembly-confidence tables remain Phase 4 work.
+Until those are available, candidate interpretation remains reference-scoped
+and assembly-caveated.
 
 The MVP supports scaffold and contig genomes, plant and non-model genomes,
 missing gene names, missing transcript biotypes, and non-GENCODE GFF3
@@ -710,9 +737,10 @@ attributes. It does not assume human chromosome names such as `chr1`.
 
 ## Scientific Roadmap
 
-The next build order is:
+The next build order after Phases 2 and 3 is:
 
-1. Add an evolutionary and pangenome module: assembly confidence,
+1. Add the Phase 4 evidence/evolution layer: Function Evidence Tensor, Element
+   Life-History, causal specificity/reach/efficacy, assembly confidence,
    repeat-array completeness, copy-number and presence/absence variation,
    strain/accession specificity, graph or pangenome coordinates, lift-over
    between assemblies, cross-species constraint, syntenic context, and
@@ -720,27 +748,20 @@ The next build order is:
 2. Add a mouse real-data benchmark with curated FASTA, gene annotation,
    RepeatMasker/TE annotation, mappability, blacklist, gap, and centromere or
    telomere tracks.
-3. Strengthen surrogate null models beyond the current matched controls,
-   including same length/GC controls, dinucleotide-preserving shuffles,
-   k-mer-preserving shuffles, TE-family/age matching, chromatin-compartment
-   matching, replication-timing matching, recombination/mutation environment
-   matching, gene/TSS-distance matching, nearby genomic controls, syntenic
-   ortholog controls, population-frequency controls, and reversed or synthetic
-   sequence controls.
-4. Add held-out and locus-level statistical calibration: per-locus splits,
+3. Extend held-out and locus-level statistical calibration: per-locus splits,
    out-of-sample calibration curves, larger-genome chromosome/block
    cross-validation benchmarks, false-discovery diagnostics, and matched-null
    calibration panels.
-5. Add foundation-model baselines so primitive scores can be compared against
+4. Add local foundation-model adapters so primitive scores can be compared against
    Enformer, Borzoi, AlphaGenome, or equivalent sequence-to-function models
    rather than only against hand-built sequence views.
-6. Make quantitative tracks first-class inputs: ATAC/RNA/ChIP/CUT&Tag,
+5. Make molecular quantitative tracks first-class inputs: ATAC/RNA/ChIP/CUT&Tag,
    conservation, replication timing, recombination, methylation, and other
    bigWig/bedGraph signals with per-track summaries and report panels.
-7. Choose one causal validation path and make it excellent: a single
+6. Choose one causal validation path and make it excellent: a single
    perturbation/readout pairing with native, scrambled, and matched-control
    sequences is stronger than many loose validation sketches.
-8. Continue enforcing the boundary between observed features and primitive
+7. Continue enforcing the boundary between observed features and primitive
    hypotheses in code, reports, cards, docs, and downstream benchmarks.
 
 Other engineering work remains useful: CI jobs for real-fixture pipelines,

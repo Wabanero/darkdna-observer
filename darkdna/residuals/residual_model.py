@@ -441,7 +441,11 @@ def residualize_scores(
                     "null_model_id": str(null_row.get("null_model_id", "")),
                     "null_panel_status": str(null_row.get("null_panel_status", "")),
                     "available_null_models": str(null_row.get("available_null_models", "")),
+                    "missing_null_models": str(null_row.get("missing_null_models", null_row.get("missing_or_partial_null_models", ""))),
                     "missing_or_partial_null_models": str(null_row.get("missing_or_partial_null_models", "")),
+                    "null_model_count": int(null_row.get("null_model_count", 0) or 0),
+                    "null_model_agreement": float(null_row.get("null_model_agreement", np.nan)),
+                    "null_model_conflict": bool(null_row.get("null_model_conflict", False)),
                     "classical_model_global_r2": r2,
                     "classical_explanation_fraction": r2,
                     "classical_explanation_fraction_deprecation_warning": (

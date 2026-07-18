@@ -21,3 +21,16 @@ def test_existing_sequence_first_commands_remain_public():
     ):
         assert command in result.output
 
+
+def test_phase2_and_phase3_commands_are_public_without_removing_mode_a():
+    result = CliRunner().invoke(app, ["--help"])
+    assert result.exit_code == 0
+    for command in (
+        "build-evolutionary-nulls",
+        "benchmark-default-state",
+        "extract-architecture-features",
+        "score-sequence-indifferent-architecture",
+        "compare-sequence-vs-quantity",
+        "infer-architecture-candidates",
+    ):
+        assert command in result.output
