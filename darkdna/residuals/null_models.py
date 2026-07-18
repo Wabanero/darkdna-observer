@@ -222,22 +222,28 @@ def build_matched_null_models(
     if reporter:
         reporter.start(f"matching controls n_controls={n_controls}")
     panel_status = null_panel_status()
-    registry_ids = [item["null_model_id"] for item in NULL_MODEL_REGISTRY]
     missing_or_partial = panel_status["missing_or_partial_null_models"]
     for idx, region_id in enumerate(region_ids, start=1):
         controls = select_matched_controls(features, region_id, n=n_controls)
         if controls.empty:
             controls = features.loc[features["region_id"].astype(str) != region_id]
-        if controls.empty:
-            controls = features
         control_ids = [rid for rid in controls["region_id"].astype(str).tolist() if rid in merged_scores.index]
         for primitive in available_score_cols:
             observed = float(merged_scores.loc[region_id, primitive])
-            null_values = merged_scores.loc[control_ids, primitive].astype(float).to_numpy() if control_ids else scores[primitive].astype(float).to_numpy()
+            null_values = merged_scores.loc[control_ids, primitive].astype(float).to_numpy() if control_ids else np.array([], dtype=float)
             null_values = null_values[np.isfinite(null_values)]
             null_mean = float(np.mean(null_values)) if null_values.size else np.nan
             null_std = float(np.std(null_values, ddof=1)) if null_values.size > 1 else 0.0
-            null_z = 0.0 if null_std == 0 or not np.isfinite(null_std) else (observed - null_mean) / null_std
+            null_z = np.nan if null_std == 0 or not np.isfinite(null_std) else (observed - null_mean) / null_std
+            if null_values.size:
+                p_value = empirical_p_value(observed, null_values, higher=True)
+                p_status = "available_explicit_matched_control_null"
+                p_reason = "One-sided empirical tail under matched_controls_v1 with the +1 finite-sample correction."
+            else:
+                p_value = np.nan
+                p_status = "unavailable"
+                p_reason = "No distinct matched control regions were available; observed genomic ranks were not substituted as a null."
+            available_models = ["matched_controls_v1"] if null_values.size else []
             rows.append(
                 {
                     "null_model_id": "matched_controls_v1",
@@ -247,10 +253,14 @@ def build_matched_null_models(
                     "null_mean": null_mean,
                     "null_std": null_std,
                     "null_zscore": float(null_z),
-                    "empirical_p_value": empirical_p_value(observed, null_values, higher=True),
+                    "null_sample_size": int(null_values.size),
+                    "empirical_p_value": float(p_value),
+                    "empirical_p_value_status": p_status,
+                    "empirical_p_value_reason": p_reason,
+                    "empirical_p_value_tail": "higher",
                     "matched_features_used": ",".join(matched_feature_columns(features)),
                     "null_panel_status": panel_status["status"],
-                    "available_null_models": ",".join(registry_ids),
+                    "available_null_models": ",".join(available_models),
                     "missing_or_partial_null_models": ",".join(missing_or_partial),
                 }
             )

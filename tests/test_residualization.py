@@ -14,7 +14,9 @@ def test_residualization_output_schema_and_leakage_guard():
     )
     covariates = pd.DataFrame({"region_id": ["r1", "r2", "r3", "r4"], "gc_content": [0.4, 0.5, 0.6, 0.7], "fractal_scaffold_candidate_score": [99, 99, 99, 99]})
     residuals, summary = residualize_scores(scores, covariates, method="linear")
-    assert {"observed_score", "predicted_classical_score", "residual_zscore", "classical_explanation_fraction"}.issubset(residuals.columns)
+    assert {"observed_score", "predicted_classical_score", "residual_zscore", "classical_model_global_r2", "classical_explanation_fraction"}.issubset(residuals.columns)
+    assert residuals["empirical_p_value"].isna().all()
+    assert set(residuals["empirical_p_value_status"]) == {"unavailable"}
     fractal_summary = summary[summary["primitive"] == "fractal_scaffold_candidate_score"].iloc[0]
     assert "fractal_scaffold_candidate_score" not in fractal_summary["covariates_used"]
     assert "unexplained_dark_anomaly_candidate_score" not in fractal_summary["covariates_used"]

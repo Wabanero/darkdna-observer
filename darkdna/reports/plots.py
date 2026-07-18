@@ -324,19 +324,20 @@ def _write_classical_control_multipanel(
 
     # Panel 1: R2-like classical explanation fraction by primitive.
     x0, y0, _ = panels[0]
-    if residuals.empty or not {"primitive", "classical_explanation_fraction"}.issubset(residuals.columns):
+    r2_column = "classical_model_global_r2" if "classical_model_global_r2" in residuals.columns else "classical_explanation_fraction"
+    if residuals.empty or "primitive" not in residuals.columns or r2_column not in residuals.columns:
         parts.append(f'<text x="{x0 + 18:.1f}" y="{y0 + 58:.1f}" font-family="Arial" font-size="12" fill="#555">No classical explanation fractions available.</text>')
     else:
-        explained = residuals[["primitive", "classical_explanation_fraction"]].drop_duplicates("primitive").copy()
-        explained["classical_explanation_fraction"] = pd.to_numeric(explained["classical_explanation_fraction"], errors="coerce").fillna(0.0)
-        explained = explained.sort_values("classical_explanation_fraction", ascending=False).head(8)
+        explained = residuals[["primitive", r2_column]].drop_duplicates("primitive").copy()
+        explained[r2_column] = pd.to_numeric(explained[r2_column], errors="coerce").fillna(0.0)
+        explained = explained.sort_values(r2_column, ascending=False).head(8)
         bar_left = x0 + 210
         bar_top = y0 + 46
         row_h = max(22, (panel_h - 74) / max(1, len(explained)))
         max_bar_w = panel_w - 255
         for idx, row in enumerate(explained.itertuples(index=False)):
             y = bar_top + idx * row_h
-            value = float(getattr(row, "classical_explanation_fraction"))
+            value = float(getattr(row, r2_column))
             label = escape(_primitive_label(getattr(row, "primitive"))[:28])
             bar_w = max(0.0, min(1.0, value)) * max_bar_w
             color = "#9b5f3f" if value >= 0.7 else "#426b69"

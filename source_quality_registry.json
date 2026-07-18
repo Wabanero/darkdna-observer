@@ -1,0 +1,29 @@
+{
+  "registry_version": "1.0",
+  "policy": "Primary studies, peer-reviewed reviews, and peer-reviewed conceptual analyses may establish implementation constraints. Popular, media, ideological, and unverified sources may not.",
+  "sources": [
+    {"id": "S01", "quality_class": "primary_computational", "short_description": "Current DarkDNA-Observer repository", "implementation_authority": "current_software_behavior"},
+    {"id": "S02", "quality_class": "peer_reviewed_perspective", "short_description": "Havstad and Palazzo difference-maker analysis", "implementation_authority": "conceptual_constraint"},
+    {"id": "S03", "quality_class": "peer_reviewed_perspective", "short_description": "Fagundes et al. junk and spam DNA", "implementation_authority": "conceptual_constraint"},
+    {"id": "S04", "quality_class": "peer_reviewed_perspective", "short_description": "Linquist causal-role myopia", "implementation_authority": "conceptual_constraint"},
+    {"id": "S05", "quality_class": "peer_reviewed_perspective", "short_description": "Graur evolutionary classification", "implementation_authority": "conceptual_constraint"},
+    {"id": "S06", "quality_class": "peer_reviewed_review", "short_description": "Moran book review and junk-filled-genome null", "implementation_authority": "benchmark_inspiration"},
+    {"id": "S07", "quality_class": "primary_computational", "short_description": "Adey et al. Puffin-D randomized-genome benchmark", "implementation_authority": "benchmark_inspiration"},
+    {"id": "S08", "quality_class": "peer_reviewed_perspective", "short_description": "GBE dark-versus-junk commentary", "implementation_authority": "interpretive_constraint"},
+    {"id": "S09", "quality_class": "peer_reviewed_perspective", "short_description": "Walter ncRNA essay", "implementation_authority": "conceptual_constraint"},
+    {"id": "S10", "quality_class": "book_or_chapter", "short_description": "Mattick and Amaral RNA-centred chapter", "implementation_authority": "hypothesis_source_only"},
+    {"id": "S11", "quality_class": "book_or_chapter", "short_description": "2026 ncRNA chapter", "implementation_authority": "taxonomy_background"},
+    {"id": "S12", "quality_class": "peer_reviewed_review", "short_description": "Plant transcriptional-junk review", "implementation_authority": "screening_layer_motivation"},
+    {"id": "S13", "quality_class": "peer_reviewed_review", "short_description": "TE DNA RNA and protein functions review", "implementation_authority": "evidence_decomposition"},
+    {"id": "S14", "quality_class": "primary_experimental", "short_description": "MER11 phylogenetic subfamily study", "implementation_authority": "benchmark_inspiration"},
+    {"id": "S15", "quality_class": "peer_reviewed_review", "short_description": "Dynamic alternative DNA structures", "implementation_authority": "evidence_level_constraint"},
+    {"id": "S16", "quality_class": "peer_reviewed_perspective", "short_description": "Flipons framework", "implementation_authority": "testable_framework_only"},
+    {"id": "S17", "quality_class": "primary_computational", "short_description": "Information and entropy analysis", "implementation_authority": "statistical_structure_only"},
+    {"id": "S18", "quality_class": "preprint", "short_description": "Agoni mutation-probability hypothesis", "implementation_authority": "speculative_model_only"},
+    {"id": "S19", "quality_class": "ideological_or_advocacy_source", "short_description": "Budinsky anti-junk design document", "implementation_authority": "none_claims_may_be_tested"},
+    {"id": "S20", "quality_class": "popular_article", "short_description": "LegalServiceIndia article", "implementation_authority": "none"},
+    {"id": "S21", "quality_class": "news_report", "short_description": "New Scientist media article", "implementation_authority": "none_until_primary_study_review"},
+    {"id": "S22a", "quality_class": "unverified", "short_description": "IEEE document 11537839", "status": "awaiting_manual_full_text_review", "implementation_authority": "none"},
+    {"id": "S22b", "quality_class": "unverified", "short_description": "ScienceDirect PII S1084952123001726", "status": "awaiting_manual_full_text_review", "implementation_authority": "none"}
+  ]
+}

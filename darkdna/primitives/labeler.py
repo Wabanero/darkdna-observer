@@ -31,13 +31,13 @@ SCORE_TO_PRIMITIVE = {
 }
 
 DOMINANCE_FEATURES = {
-    "fractal_scaffold_candidate": ["fractal_score", "scale_persistence_score"],
+    "fractal_scaffold_candidate": ["multiscale_texture_screening_score", "DFA_surrogate_zscore", "multiscale_parent_child_similarity_screen"],
     "constraint_grammar_region_candidate": ["grammar_entropy", "Markov_order_anomaly", "motif_like_token_recurrence"],
-    "non_B_DNA_physical_susceptibility_candidate": ["G4_susceptibility_proxy", "non_B_DNA_aggregate_score", "charge_oxidation_susceptibility_score"],
+    "non_B_DNA_physical_susceptibility_candidate": ["G4_sequence_potential", "Z_DNA_sequence_potential", "R_loop_susceptibility_sequence_potential", "charge_oxidation_susceptibility_score"],
     "replication_instability_candidate": ["fork_texture_score", "simple_repeat_fraction", "palindrome_density"],
     "decoherence_boundary_candidate": ["decoherence_boundary_candidate_score", "entropy_boundary_score"],
     "resonant_pulse_decoder_candidate": ["phase_periodicity_around_10bp", "spacing_periodicity_fourier_power"],
-    "hysteresis_candidate": ["left_right_GC_asymmetry", "nested_repeat_architecture_score", "non_B_DNA_aggregate_score"],
+    "hysteresis_candidate": ["left_right_GC_asymmetry", "nested_repeat_architecture_score", "G4_sequence_potential", "Z_DNA_sequence_potential"],
     "possibility_gate_candidate": ["boundary_condition_candidate_score", "negative_space_boundary_score", "forbidden_word_depletion_enrichment"],
     "criticality_tuner_candidate": ["entropy_boundary_score", "compression_boundary_score", "local_feature_transition_score"],
     "chromatin_motion_oscillator_candidate": ["spacing_periodicity_autocorrelation", "DNA_bendability_proxy", "left_right_entropy_asymmetry"],
@@ -84,7 +84,8 @@ def assign_primitive_labels(
     for idx, (region_id, group) in enumerate(residuals.groupby("region_id"), start=1):
         best = _best_residual_for_region(group)
         primitive = SCORE_TO_PRIMITIVE.get(best["primitive"], "unexplained_dark_anomaly_candidate")
-        rz = float(best.get("residual_zscore", 0.0) or 0.0)
+        rz_value = best.get("residual_zscore", np.nan)
+        rz = float(rz_value) if pd.notna(rz_value) and np.isfinite(float(rz_value)) else 0.0
         nz = float(best.get("matched_null_zscore", 0.0) if pd.notna(best.get("matched_null_zscore", np.nan)) else 0.0)
         if rz < residual_threshold and nz < matched_null_threshold:
             primitive = "unexplained_dark_anomaly_candidate" if float(group["residual_zscore"].max()) >= residual_threshold else "no_call"
@@ -92,17 +93,27 @@ def assign_primitive_labels(
         window_row = window_lookup.loc[region_id] if not window_lookup.empty and region_id in window_lookup.index else None
         flags = window_row.get("artifact_risk_flags", "") if window_row is not None else ""
         artifact_score = artifact_risk_score(flags)
-        confidence = max(0.0, min(1.0, (max(rz, 0.0) + max(nz, 0.0)) / 8.0)) * (1.0 - 0.35 * artifact_score)
+        priority = max(0.0, min(1.0, (max(rz, 0.0) + max(nz, 0.0)) / 8.0)) * (1.0 - 0.35 * artifact_score)
         supporting = _supporting_features(feature_row, primitive)
         rows.append(
             {
                 "region_id": region_id,
                 "primitive_class": primitive,
                 "primitive_score_name": best["primitive"],
-                "primitive_confidence": float(confidence),
+                "primitive_priority": float(priority),
+                "primitive_priority_status": "uncalibrated_ranking_priority_not_probability",
+                "primitive_confidence": float(priority),
+                "primitive_confidence_deprecation_warning": (
+                    "Deprecated alias for primitive_priority; this 0-1 ranking heuristic is not calibrated confidence or probability."
+                ),
                 "residual_zscore": rz,
                 "matched_null_zscore": nz,
-                "empirical_p_value": float(best.get("empirical_p_value", np.nan)),
+                "empirical_p_value": (
+                    float(best.get("empirical_p_value"))
+                    if pd.notna(best.get("empirical_p_value", np.nan))
+                    else np.nan
+                ),
+                "empirical_p_value_status": str(best.get("empirical_p_value_status", "")),
                 "top_supporting_features": ";".join(supporting),
                 "artifact_risk_flags": flags,
                 "recommended_assay": recommend_assay(primitive).get("assay", ""),

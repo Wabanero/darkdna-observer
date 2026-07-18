@@ -74,7 +74,7 @@ For each window it computes sequence-derived views:
 - negative-space features that measure structured absence, deserts, and local
   feature voids
 - transposable-element grammar features when TE annotations are available
-- multiscale/fractal-like summaries and scale persistence
+- diagnostically gated multiscale texture, scaling-fit diagnostics, surrogate tests, and descriptive parent/child similarity
 
 The outputs are candidate hypotheses for prioritization and assay design. A
 high score means "this window deserves controlled follow-up", not "this window
@@ -88,9 +88,9 @@ review, but the labels are not themselves observed molecular properties.
 
 | Primitive candidate | Main evidence | What it means in this tool | Required follow-up |
 | --- | --- | --- | --- |
-| `fractal_scaffold_candidate` | fractal score, scale persistence, compression anomaly | Scale-persistent sequence texture or numeric-walk structure. | Folding, compaction, or multiscale perturbation assays with shuffled controls. |
+| `fractal_scaffold_candidate` | multiscale texture screen, valid scaling interval, surrogate z-score, calibrated compression | Candidate multiscale sequence texture; this is not a confirmed fractal label. | Folding, compaction, or multiscale perturbation assays with shuffled controls. |
 | `constraint_grammar_region_candidate` | grammar entropy, forbidden-word depletion, motif-like recurrence, Markov anomaly | Sequence grammar or spacing structure that is not explained by simple composition. | Grammar scramble, tiling, motif/spacing perturbation assays. |
-| `non_B_DNA_physical_susceptibility_candidate` | G4, non-B-DNA aggregate, charge/oxidation susceptibility proxies | Physical-susceptibility candidate based on G-rich and non-B-prone sequence contexts. | G4/oxidation/nanopore or other physical validation. No claim of quantum susceptibility or actual quantum effects. |
+| `non_B_DNA_physical_susceptibility_candidate` | structure-specific G4, i-motif, Z-DNA, triplex, cruciform, hairpin, slipped-DNA, R-loop, and A-tract Level-1 screens | Physical-susceptibility candidate based on sequence potential; context-conditioned formation and observed structure are separate evidence levels. | Structure-specific physical validation. No claim of quantum susceptibility or actual quantum effects. |
 | `replication_instability_candidate` | fork texture, repeats, palindromes, skew, non-B propensity | Sequence architecture compatible with replication-stress susceptibility. | Replication timing, fork-pausing, or stress/recovery assays. |
 | `chromatin_motion_oscillator_candidate` | spacing autocorrelation, bendability proxy, entropy asymmetry | Static sequence candidate for locus-motion or spatial-dynamics testing. | Live-locus motion or spatial-dynamics assays. |
 | `decoherence_boundary_candidate` | entropy cliffs, boundary scores, compression changes, feature voids | Noise/variance boundary candidate from sequence-regime transitions. | Single-cell variance, reporter covariance, or noise-propagation assays. |
@@ -103,8 +103,10 @@ review, but the labels are not themselves observed molecular properties.
 | `TE_grammar_node_candidate` | TE overlap, TE mosaic score, TE boundary score, TE orientation entropy | TE-derived or TE-mosaic sequence architecture beyond simple overlap. | TE-order/orientation perturbation and TE-derived regulatory comparison. |
 | `unexplained_dark_anomaly_candidate` | high residual anomaly without one dominant class | A prioritized unannotated/noncoding window that needs review before interpretation. | Matched-null review, artifact checks, and orthogonal validation. |
 
-Every primitive score is paired with robust z-scores, empirical p-values,
-matched-null summaries, residual anomaly scores, and artifact-risk flags.
+Every primitive score is paired with calibration status, a component/correlation
+audit, matched-null summaries when a named null exists, residual diagnostics,
+and artifact-risk flags. An empirical p-value is `NA` unless a named null
+distribution exists; ranks among observed genomic windows are not p-values.
 
 The old internal/public label `quantum_susceptible_domain_candidate` has been
 retired. G-richness, G4 propensity, oxidation-prone contexts, Z-DNA/R-loop/triplex
@@ -144,9 +146,10 @@ specific perturbation experiment.
 
 ## Composite Score Caveat
 
-Current primitive score columns are equal-weight screening composites. They are
-useful as transparent review views, but their weights are not yet learned,
-probabilistically calibrated, or validated as stable biological quantities.
+Canonical primitive score columns are covariance-aware, robustly
+cohort-standardized screening views. They remain non-probabilistic and are not
+null significance. Historical row-local equal-weight values are retained only
+as `*_legacy_screening_composite` migration fields.
 
 Before a composite can be treated as more than a ranking heuristic, the project
 must show:
@@ -161,10 +164,11 @@ must show:
 - probabilistic calibration on held-out loci
 - reproducibility under held-out chromosome or genomic-block splits
 
-The committed pipeline now writes `primitive_score_manifest.json` next to
-`primitive_scores.parquet`. That manifest lists the current component features,
-the equal-weight status, and the validation work required before mechanistic
-interpretation.
+The pipeline writes `primitive_score_manifest.json` next to
+`primitive_scores.parquet`. It records feature orientations, component
+availability, correlation/double-counting audits, the covariance-aware
+combination method, the explicit-null p-value policy, and validation work still
+required before mechanistic interpretation.
 
 ## Classical Controls And Residuals
 
@@ -192,7 +196,7 @@ distance, TSS distance, window size, and local background terms. It deliberately
 does not use primitive score columns or hidden/anomaly-view columns as controls,
 because that would regress away the signal being tested.
 
-The result should be read together with `classical_explanation_fraction`,
+The result should be read together with `classical_model_global_r2`,
 `matched_null_zscore`, `empirical_p_value`, and artifact flags. A high residual
 with weak matched-null support is a review target; a high residual with strong
 matched-null support is a stronger assay candidate.
@@ -221,6 +225,40 @@ for some sequence shuffles, but it does not yet run the full severe null panel.
 The pipeline therefore writes `null_model_registry.json`, and region cards carry
 `null_model_panel` so downstream users can see which null families are missing
 or only partially available.
+
+`classical_explanation_fraction` remains a deprecated compatibility alias for
+`classical_model_global_r2`. The value is model-level, can be negative under
+cross-validation, and is not a per-region causal variance decomposition.
+
+## v2 Evidence Architecture
+
+The v2 design keeps six modes separate until an explicit evidence-integration
+stage:
+
+- Mode A — sequence-specific intrinsic architecture (the current implemented workflow)
+- Mode B — sequence-indifferent amount, length, copy, and spacing architecture (deferred to Phase 3)
+- Mode C — context-conditioned conformation and molecular state (deferred)
+- Mode D — transcription, RNA-product, and hidden-translation mechanisms (deferred)
+- Mode E — dynamic perturbation and state-transition evidence (deferred)
+- Mode F — evolutionary history, maintenance, and population evidence (deferred)
+
+The planned Function Evidence Tensor will preserve causal role, organism-level
+fitness, maintenance selection, origin selection, exaptation, selfish-element
+evidence, deleterious burden, and replication as separate axes. The planned
+Element Life-History model will separately represent birth, initial status,
+persistence, current status, and transitions. Neither is faked by placeholder
+zeros in Phase 1.
+
+Mode B will test whether DNA amount, length, copy number, spacing, or occupancy
+acts as a difference-maker when exact nucleotide identity is replaceable. Such
+an effect would not demonstrate that the DNA originated or is maintained by
+selection for that effect.
+
+Phase 1 adds negative evidence as a first-class output. Missing controls produce
+`insufficient_evidence`; decisive artifacts, null explanations, powered negative
+perturbations, failed rescue, or failed replication can reject or downgrade a
+candidate. The pipeline does not escalate every anomaly through increasingly
+speculative assays.
 
 ## Assembly And Pangenome First
 
@@ -498,6 +536,8 @@ Feature, score, and residual commands write:
 - `sequence_features.parquet`
 - `primitive_scores.parquet`
 - `primitive_score_manifest.json`
+- `negative_evidence.json`
+- `negative_evidence.parquet`
 - `classical_covariates.parquet`
 - `matched_nulls.parquet`
 - `null_model_summary.parquet`

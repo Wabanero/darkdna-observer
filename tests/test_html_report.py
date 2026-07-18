@@ -56,6 +56,7 @@ def test_html_report_generation(tmp_path):
     assert "Terminology" in html
     assert "Score methodology" in html
     assert "Null model panel" in html
+    assert "Rejected or downgraded candidates" in html
     assert "Hypothesized primitive behavior" in html
     assert "Standalone card" in html
     assert "Prompt" not in html

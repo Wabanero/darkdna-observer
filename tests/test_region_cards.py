@@ -52,9 +52,11 @@ def test_region_card_contains_assay_blueprint_fields():
     assert "not observed molecular properties" in cards[0]["feature_hypothesis_boundary"]
     assert "Dark is an operational project term" in cards[0]["terminology_scope"]["dark_operational_use"]
     assert cards[0]["assembly_pangenome_context"]["current_scope"] == "reference_based_window"
-    assert cards[0]["score_methodology"]["score_status"] == "uncalibrated_equal_weight_screening_composite"
+    assert cards[0]["score_methodology"]["score_status"] == "covariance_aware_cohort_standardized_screening_score"
     assert "depleted_kmer_score" in cards[0]["score_methodology"]["component_features"]
     assert cards[0]["null_model_panel"]["status"] == "insufficient_single_matched_null_until_complementary_nulls_pass"
+    assert cards[0]["negative_evidence"]["candidate_status"] == "insufficient_evidence"
+    assert "does not establish" in cards[0]["evolutionary_interpretation_caveat"]
 
 
 def test_region_card_uses_primitive_specific_key_tests():

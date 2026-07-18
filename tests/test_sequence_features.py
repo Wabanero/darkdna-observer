@@ -8,6 +8,8 @@ def test_gc_entropy_lz_and_compression_features():
     assert features["Shannon_entropy"] > 1.9
     assert features["Lempel_Ziv_complexity"] > 0
     assert features["gzip_compression_ratio"] > 0
+    assert "gzip_header_corrected_ratio" in features
+    assert features["compression_calibration_status"] in {"available", "partial", "unavailable"}
     assert "k4_mer_entropy" in features
 
 
@@ -16,3 +18,5 @@ def test_all_sequence_features_include_view_inputs():
     assert "G4_susceptibility_proxy" in features
     assert "grammar_entropy" in features
     assert "fractal_score" in features
+    assert "multiscale_texture_screening_score" in features
+    assert "numeric_walk_mapping_registry" in features

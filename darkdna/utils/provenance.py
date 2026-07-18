@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from darkdna import __version__
+
 from .config import ObserverConfig, write_config_snapshot
 from .optional_deps import write_optional_dependency_report
 
@@ -50,6 +52,8 @@ def write_provenance(
     metadata = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "command": command,
+        "darkdna_observer_version": __version__,
+        "scientific_method_contract": "v2_phase1",
         "random_seed": config.random_seed,
         "input_file_checksums": checksums,
     }

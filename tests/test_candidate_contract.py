@@ -33,20 +33,22 @@ def test_sequence_only_scores_do_not_produce_prompt2_dynamic_scores():
     assert forbidden.isdisjoint(scores.columns)
     assert "possibility_gate_candidate_score" in scores.columns
     assert "criticality_tuner_candidate_score" in scores.columns
-    assert scores.iloc[0]["hysteresis_candidate_score_weighting_scheme"] == "equal_weight_mean_screening_composite"
-    assert "uncalibrated" in scores.iloc[0]["hysteresis_candidate_score_calibration_status"]
+    assert scores.iloc[0]["hysteresis_candidate_score_weighting_scheme"] == "covariance_aware_robust_cohort_standardization"
+    assert "not_null_calibrated" in scores.iloc[0]["hysteresis_candidate_score_calibration_status"]
+    assert scores.iloc[0]["hysteresis_candidate_score_empirical_p_value_status"] == "unavailable"
 
 
 def test_primitive_score_manifest_marks_composites_as_screening_views():
     manifest = primitive_score_manifest()
-    assert manifest["score_status"] == "uncalibrated_equal_weight_screening_composite"
+    assert manifest["score_status"] == "covariance_aware_cohort_standardized_screening_score"
     assert manifest["interpretation_order"] == [
         "measured_feature_profile",
-        "statistical_anomaly_after_controls_and_nulls",
+        "statistical_anomaly_after_explicit_controls_and_nulls",
         "post_hoc_mechanistic_hypothesis",
     ]
     assert "hysteresis_candidate_score" in manifest["components"]
-    assert "audit_double_counting_between_correlated_features" in manifest["required_validation_before_mechanistic_use"]
+    assert "correlation_and_double_counting_audit" in manifest["required_validation_before_mechanistic_use"]
+    assert manifest["empirical_p_value_policy"] == "unavailable_without_explicit_null_distribution"
 
 
 def test_ontology_distinguishes_candidate_and_confirmed_names():

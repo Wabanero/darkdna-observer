@@ -26,6 +26,7 @@ from darkdna.utils.config import load_config, resolve_config_path, write_config_
 from darkdna.utils.logging import get_logger
 from darkdna.utils.progress import ProgressReporter, progress_message
 from darkdna.utils.provenance import write_provenance
+from darkdna.validation.negative_evidence import write_negative_evidence
 from darkdna.views.multiscale_profiles import compute_multiscale_profiles
 from darkdna.views.primitive_scores import score_primitives, write_primitive_scores
 from darkdna.windows.make_windows import make_dark_windows, write_windows
@@ -191,6 +192,7 @@ def run_config_pipeline(
     progress_message("pipeline", f"stage {stage}/{len(PIPELINE_STAGE_NAMES)} {PIPELINE_STAGE_NAMES[stage - 1]}")
     cards = make_region_cards(windows_df, labels_df, residuals_df, features_df, top_n=top_n_cards, progress=True)
     card_paths = write_region_cards(cards, outdir)
+    write_negative_evidence([{"region_id": card["region_id"], **card["negative_evidence"]} for card in cards], outdir)
     write_provenance(outdir, "darkdna run: make-region-cards", cfg, [window_paths["parquet"], label_path, residual_paths["residuals"], feature_path])
     logger.info("Wrote %d region cards to %s", len(cards), card_paths["json"])
     pipeline.update(stage, message=f"cards={len(cards)}", force=True)
@@ -444,6 +446,7 @@ def make_region_cards_cmd(
     feature_table = read_table(features) if features else pd.DataFrame()
     cards = make_region_cards(window_table, label_table, residual_table, feature_table, top_n=top_n, progress=True)
     paths = write_region_cards(cards, outdir)
+    write_negative_evidence([{"region_id": card["region_id"], **card["negative_evidence"]} for card in cards], outdir)
     write_provenance(outdir, "darkdna make-region-cards", cfg, [windows, labels, residuals, features])
     logger.info("Wrote %d region cards to %s", len(cards), paths["json"])
 

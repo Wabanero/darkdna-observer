@@ -71,6 +71,10 @@ REPORT_TEMPLATE = """<!doctype html>
   <h2>Top Residual Anomalies</h2>
   {{ top_residuals_html }}
 
+  <h2>Rejected or downgraded candidates</h2>
+  <p class="caveat">Decisive negative controls and artifact-compatible explanations are shown rather than hidden. Missing controls are insufficient evidence, not positive support.</p>
+  {{ rejected_candidates_html }}
+
   <h2>Top Negative-Space Candidates</h2>
   {{ negative_space_html }}
 
@@ -112,6 +116,9 @@ REPORT_TEMPLATE = """<!doctype html>
       {% if card.null_model_panel %}
       <p><strong>Null model panel:</strong> {{ card.null_model_panel.status }}. {{ card.null_model_panel.caveat }}</p>
       {% endif %}
+      {% if card.negative_evidence %}
+      <p><strong>Negative evidence:</strong> {{ card.negative_evidence.candidate_status }} / {{ card.negative_evidence.decision }}; decisive negatives={{ card.negative_evidence.decisive_negative_count }}.</p>
+      {% endif %}
       {% if card.mechanistic_bridge %}
       <p><strong>Mechanistic bridge:</strong> {{ card.mechanistic_bridge.measured_feature }} &rarr; {{ card.mechanistic_bridge.proposed_dynamic_phenotype }}</p>
       <p><strong>Bridge status:</strong> {{ card.mechanistic_bridge.bridge_status }}. {{ card.mechanistic_bridge.assay_scope_if_bridge_missing }}</p>
@@ -119,7 +126,7 @@ REPORT_TEMPLATE = """<!doctype html>
       {% if card.native_context_caveat %}
       <p><strong>Native-context caveat:</strong> {{ card.native_context_caveat }}</p>
       {% endif %}
-      <p><strong>Coordinates:</strong> {{ card.coordinates }}; <strong>Confidence:</strong> {{ "%.3f"|format(card.primitive_confidence) }}</p>
+      <p><strong>Coordinates:</strong> {{ card.coordinates }}; <strong>Uncalibrated priority:</strong> {{ "%.3f"|format(card.primitive_confidence) }}</p>
       <p><strong>Assay:</strong> {{ card.recommended_primitive_assay }}</p>
       <p><strong>Key test:</strong> {{ card.key_interaction_test }}</p>
       <p><strong>Caveat:</strong> {{ card.interpretation_caveat }}</p>
@@ -198,6 +205,19 @@ def generate_html_report(
     provenance_path = out / "run_metadata.json"
     provenance = provenance_path.read_text(encoding="utf-8") if provenance_path.exists() else "Provenance not found in report directory."
     report_cards = augment_cards_with_visuals(cards[:25], windows, labels, residuals, loci, out)
+    rejected_candidates = pd.DataFrame(
+        [
+            {
+                "region_id": card.get("region_id"),
+                "primitive_class": card.get("primitive_class"),
+                "candidate_status": card.get("negative_evidence", {}).get("candidate_status"),
+                "decision": card.get("negative_evidence", {}).get("decision"),
+                "decisive_negative_count": card.get("negative_evidence", {}).get("decisive_negative_count"),
+            }
+            for card in cards
+            if card.get("negative_evidence", {}).get("decision") == "reject_or_downgrade"
+        ]
+    )
     html = Template(REPORT_TEMPLATE).render(
         project_name=project_name,
         input_summary=input_summary or {},
@@ -218,6 +238,7 @@ def generate_html_report(
         ),
         top_candidates_html=_table_html(top_candidates),
         top_residuals_html=_table_html(top_residuals),
+        rejected_candidates_html=_table_html(rejected_candidates, empty_message="No candidate had decisive negative evidence in the supplied inputs."),
         negative_space_html=_table_html(negative),
         boundary_html=_table_html(boundary),
         te_html=_table_html(te, empty_message="No active TE-grammar candidates. TE annotation may be absent, or all TE grammar scores are zero after classical controls and matched-null comparison."),

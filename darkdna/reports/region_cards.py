@@ -12,6 +12,7 @@ from darkdna.primitives.assay_recommender import recommend_assay
 from darkdna.primitives.ontology import get_primitive
 from darkdna.residuals.null_models import null_panel_status
 from darkdna.utils.progress import ProgressReporter
+from darkdna.validation.negative_evidence import candidate_negative_evidence
 from darkdna.views.primitive_scores import primitive_score_manifest
 
 
@@ -86,7 +87,21 @@ def top_scores_for_region(residuals: pd.DataFrame, region_id: str, n: int = 5) -
     if subset.empty:
         return []
     subset["abs_residual"] = subset["residual_zscore"].abs()
-    cols = ["primitive", "observed_score", "residual_zscore", "matched_null_zscore", "empirical_p_value", "classical_explanation_fraction"]
+    cols = [
+        column
+        for column in [
+            "primitive",
+            "observed_score",
+            "residual_zscore",
+            "residual_zscore_method",
+            "matched_null_zscore",
+            "empirical_p_value",
+            "empirical_p_value_status",
+            "classical_model_global_r2",
+            "classical_explanation_fraction",
+        ]
+        if column in subset.columns
+    ]
     return subset.sort_values("abs_residual", ascending=False)[cols].head(n).to_dict(orient="records")
 
 
@@ -108,7 +123,10 @@ def residualization_summary(residuals: pd.DataFrame, region_id: str) -> dict:
     return {
         "observed_score": top[0].get("observed_score"),
         "residual_zscore": top[0].get("residual_zscore"),
+        "residual_zscore_method": top[0].get("residual_zscore_method"),
+        "classical_model_global_r2": top[0].get("classical_model_global_r2", top[0].get("classical_explanation_fraction")),
         "classical_explanation_fraction": top[0].get("classical_explanation_fraction"),
+        "migration_warning": "classical_explanation_fraction is a deprecated alias for the model-level classical_model_global_r2.",
     }
 
 
@@ -197,6 +215,18 @@ def build_region_card(
         "forbidden_interpretation": ontology.forbidden_interpretation,
     }
     mechanistic_bridge = assay.get("mechanistic_bridge", {})
+    feature_row = None
+    if features is not None and not features.empty and "region_id" in features.columns:
+        feature_subset = features[features["region_id"].astype(str) == region_id]
+        if not feature_subset.empty:
+            feature_row = feature_subset.iloc[0]
+    window_shift_status = str(feature_row.get("DFA_window_shift_status", "")) if feature_row is not None else ""
+    negative_evidence = candidate_negative_evidence(
+        artifact_risk_flags=artifact_risk_flags,
+        null_panel_status=str(null_model_panel_summary(residuals, region_id).get("status", "")),
+        window_shift_status=window_shift_status,
+        bridge_status=str(mechanistic_bridge.get("bridge_status", "")),
+    )
     card = {
         "region_id": region_id,
         "coordinates": f"{window.get('chrom')}:{int(window.get('start'))}-{int(window.get('end'))}",
@@ -212,6 +242,8 @@ def build_region_card(
         "assembly_pangenome_context": assembly_pangenome_context(window),
         "score_methodology": score_methodology_summary(label),
         "null_model_panel": null_model_panel_summary(residuals, region_id),
+        "negative_evidence": negative_evidence,
+        "candidate_support_status": negative_evidence["candidate_status"],
         "confirmed_name": ontology.confirmed_name,
         "requires_dynamic_validation": bool(ontology.requires_dynamic_data),
         "required_validation_data": ontology.required_input_level,
@@ -257,6 +289,9 @@ def build_region_card(
         "interpretation_caveat": (
             "This card is an assay-generating hypothesis, not a functional annotation. "
             "If the mechanistic bridge is unvalidated, the assay is exploratory rather than direct primitive validation."
+        ),
+        "evolutionary_interpretation_caveat": (
+            "A causal or quantity-dependent effect does not establish that the element originated or is maintained by selection for that effect."
         ),
     }
     if assay.get("temporal_interaction_test"):
@@ -310,6 +345,8 @@ def write_region_cards(cards: list[dict], outdir: str | Path) -> dict[str, Path]
                 "assembly_pangenome_caveat": c["assembly_pangenome_context"]["caveat"],
                 "score_methodology_caveat": c["score_methodology"]["caveat"],
                 "null_model_panel_status": c["null_model_panel"]["status"],
+                "candidate_support_status": c["candidate_support_status"],
+                "negative_evidence_decision": c["negative_evidence"]["decision"],
                 "mechanistic_bridge_status": c["mechanistic_bridge"].get("bridge_status", ""),
                 "assay_validation_scope": c["assay_validation_scope"],
                 "native_context_caveat": c["native_context_caveat"],

@@ -35,7 +35,7 @@ def _bridge(
 
 MECHANISTIC_BRIDGES: dict[str, dict] = {
     "fractal_scaffold_candidate": _bridge(
-        "fractal_score, scale_persistence_score, compression anomaly, or numeric-walk texture",
+        "diagnostically valid multiscale texture, surrogate-standardized DFA, calibrated compression, or numeric-walk texture",
         "folding, compaction, or multiscale scaffold behavior",
         [
             "polymer physics or coarse-grained DNA simulations",
