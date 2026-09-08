@@ -40,13 +40,13 @@ def test_prepare_classical_covariates_excludes_anomaly_features():
             "region_id": ["r1"],
             "simple_repeat_fraction": [0.12],
             "fractal_score": [0.9],
-            "hysteresis_candidate_score": [0.8],
+            "asymmetric_repeat_architecture_candidate_score": [0.8],
         }
     )
     covariates = prepare_classical_covariates(windows, features)
     assert {"gc_content", "simple_repeat_fraction", "mappability", "window_size"}.issubset(covariates.columns)
     assert "fractal_score" not in covariates.columns
-    assert "hysteresis_candidate_score" not in covariates.columns
+    assert "asymmetric_repeat_architecture_candidate_score" not in covariates.columns
 
 
 def test_residualization_uses_blocked_cv_groups_without_covariate_leakage():

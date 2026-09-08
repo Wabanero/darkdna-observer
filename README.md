@@ -92,14 +92,10 @@ review, but the labels are not themselves observed molecular properties.
 | `constraint_grammar_region_candidate` | grammar entropy, forbidden-word depletion, motif-like recurrence, Markov anomaly | Sequence grammar or spacing structure that is not explained by simple composition. | Grammar scramble, tiling, motif/spacing perturbation assays. |
 | `non_B_DNA_physical_susceptibility_candidate` | structure-specific G4, i-motif, Z-DNA, triplex, cruciform, hairpin, slipped-DNA, R-loop, and A-tract Level-1 screens | Physical-susceptibility candidate based on sequence potential; context-conditioned formation and observed structure are separate evidence levels. | Structure-specific physical validation. No claim of quantum susceptibility or actual quantum effects. |
 | `replication_instability_candidate` | fork texture, repeats, palindromes, skew, non-B propensity | Sequence architecture compatible with replication-stress susceptibility. | Replication timing, fork-pausing, or stress/recovery assays. |
-| `chromatin_motion_oscillator_candidate` | spacing autocorrelation, bendability proxy, entropy asymmetry | Static sequence candidate for locus-motion or spatial-dynamics testing. | Live-locus motion or spatial-dynamics assays. |
-| `decoherence_boundary_candidate` | entropy cliffs, boundary scores, compression changes, feature voids | Noise/variance boundary candidate from sequence-regime transitions. | Single-cell variance, reporter covariance, or noise-propagation assays. |
-| `hysteresis_candidate` | GC asymmetry, nested repeats, non-B propensity, recurrent-kmer orientation | Candidate for history-dependent behavior testing. | Perturbation, recovery, and time/history interaction experiments. |
-| `resonant_pulse_decoder_candidate` | 10 bp/147 bp periodicity, Fourier/autocorrelation spacing power | Periodic or phase-like sequence grammar candidate. | Pulse-frequency or time-course perturbation assays. |
-| `possibility_gate_candidate` | boundary condition score, negative-space boundary, forbidden-word depletion | Boundary/constraint-like region that may alter reachable state tests. | State-transition, pseudotime, or fate-mapping validation. |
-| `criticality_tuner_candidate` | sequence boundary, entropy boundary, compression boundary | Candidate threshold-like sequence transition. | Dose-gradient, perturbation-threshold, or recovery-rate assays. |
+| `periodic_spacing_grammar_candidate` | 10 bp/147 bp periodicity, Fourier/autocorrelation spacing power | Periodic or phase-like sequence grammar. Not pulse decoding or chromatin motion. | Phase-scramble or periodicity-disruption tiling; later dynamic assays only after a molecular bridge. |
+| `asymmetric_repeat_architecture_candidate` | GC asymmetry, nested repeats, recurrent-k-mer orientation | Oriented or nested repeat architecture. Not hysteresis or memory. | Orientation-inverted and nest-disrupted controls; later recovery assays only after a molecular bridge. |
 | `negative_space_element_candidate` | depleted k-mers, motif deserts, repeat/CpG/G-tract deserts, local voids | Structured absence that remains anomalous after controls. | Rescue/scramble assays that reinsert or disrupt missing tokens. |
-| `sequence_regime_boundary_candidate` | left/right regime difference, entropy/GC/CpG/repeat/compression shifts | Candidate boundary between intrinsic sequence regimes. | Boundary smoothing, disruption, insulation, or accessibility assays. |
+| `sequence_regime_boundary_candidate` | left/right regime difference, entropy/GC/CpG/repeat/compression shifts, feature voids | The single sequence-regime-transition axis. Retired Mode E names (`decoherence_boundary`, `possibility_gate`, `criticality_tuner`) alias here. | Boundary smoothing, disruption, insulation, or accessibility assays. |
 | `TE_grammar_node_candidate` | TE overlap, TE mosaic score, TE boundary score, TE orientation entropy | TE-derived or TE-mosaic sequence architecture beyond simple overlap. | TE-order/orientation perturbation and TE-derived regulatory comparison. |
 | `unexplained_dark_anomaly_candidate` | high residual anomaly without one dominant class | A prioritized unannotated/noncoding window that needs review before interpretation. | Matched-null review, artifact checks, and orthogonal validation. |
 
@@ -139,7 +135,7 @@ measured feature profile
   -> post-hoc mechanistic hypothesis
 ```
 
-The reverse order is not allowed: a high `hysteresis_candidate_score`, for
+The reverse order is not allowed: a high `asymmetric_repeat_architecture_candidate_score`, for
 example, is not evidence that a locus has hysteresis. It is only a screening
 view that can motivate a better calibrated anomaly analysis and, eventually, a
 specific perturbation experiment.
@@ -620,9 +616,12 @@ effect = (Native_treatment - Native_control) - (ControlSequence_treatment - Cont
 The report renders a primitive-specific version of that contrast for each card:
 folding/compaction for `fractal_scaffold_candidate`, oxidation/G4 or physical
 susceptibility for `non_B_DNA_physical_susceptibility_candidate`, fork pausing for
-`replication_instability_candidate`, pulse/frequency response for
-`resonant_pulse_decoder_candidate`, state-transition probability for
-`possibility_gate_candidate`, and so on.
+`replication_instability_candidate`, phase-scramble tiling for
+`periodic_spacing_grammar_candidate`, boundary disruption for
+`sequence_regime_boundary_candidate`, and so on.
+
+Later Mode E assays (pulse decoding, fate mapping, live-locus motion) are
+Prompt 2 hypotheses. They are not the primary architecture label.
 
 Temporal or memory-like candidates require sequence-by-treatment-by-time/history
 validation before any dynamic interpretation.
@@ -637,23 +636,22 @@ could this candidate mean?": it sketches the measured sequence proxy, the
 candidate primitive hypothesis, and the assay readout that would be needed to
 test the bridge.
 
-![Example decoherence-boundary candidate card](assets/readme/region-card-decoherence-boundary.png)
+![Example sequence-regime-boundary candidate card](assets/readme/region-card-decoherence-boundary.png)
 
-In this example, a `decoherence_boundary_candidate` is not a claim of physical
-decoherence. It means the sequence window has boundary-like evidence such as an
-entropy cliff, regime transition, compression boundary, or local feature void.
-The generated hypothesis is that this region may behave like a noise or
-variance-propagation boundary, which would need a noise-propagation or
-single-cell variance assay before any dynamic interpretation is allowed.
+In this example, a `sequence_regime_boundary_candidate` is not a claim of physical
+decoherence, noise insulation, or criticality. It means the sequence window has
+a left/right regime transition such as an entropy cliff, compression boundary,
+or local feature void. The generated hypothesis is that this region may behave
+like a molecular boundary, which would need a boundary-disruption assay before
+any dynamic interpretation is allowed.
 
-![Example possibility-gate candidate card](assets/readme/region-card-possibility-gate.png)
+![Example neighborhood candidate card](assets/readme/region-card-possibility-gate.png)
 
-In this example, a `possibility_gate_candidate` means the local sequence has
-boundary-condition, negative-space, or forbidden-word-depletion evidence near
-other primitive-labeled windows. The sketch proposes a state-transition or
-reachable-state gating hypothesis, not a confirmed regulatory role. It becomes
-meaningful only if a follow-up assay can show that the native sequence changes
-state-transition behavior relative to matched controls.
+In this example, competing architecture classes can appear together near a
+regime boundary. The sketch proposes a sequence-architecture hypothesis, not a
+confirmed regulatory role or a Mode E identity such as a possibility gate. It
+becomes meaningful only if a follow-up assay can show that the native sequence
+changes a molecular readout relative to matched controls.
 
 ## Mechanistic Bridge Requirement
 
@@ -673,11 +671,10 @@ simulations, DNA shape models, nucleosome occupancy predictions, in vitro
 nucleosome assembly, single-molecule force measurements, and length-matched plus
 k-mer-preserved controls.
 
-Likewise, a `resonant_pulse_decoder_candidate` does not follow automatically
+Likewise, a `periodic_spacing_grammar_candidate` does not follow automatically
 from periodic sequence. The bridge must identify an intermediate mechanism such
-as nucleosome phasing, TF cooperative binding, mechanosensitivity, replication
-dynamics, or chromatin looping before a temporal pulse assay can be interpreted
-as primitive validation.
+as nucleosome phasing, TF cooperative binding, or DNA shape periodicity before
+a later temporal pulse assay can be interpreted as primitive validation.
 
 If the bridge is unvalidated or missing, the assay remains exploratory. It can
 generate bridge evidence, but it should not be reported as direct validation of

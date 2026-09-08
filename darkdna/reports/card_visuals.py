@@ -410,7 +410,7 @@ def _primitive_model_panel(card: dict, primitive: str, y: float, width: int) -> 
 def _primitive_symbol(primitive: str, x: float, y: float) -> list[str]:
     key = str(primitive)
     parts = [f'<rect x="{x - 10}" y="{y - 8}" width="260" height="96" fill="#ffffff" stroke="#d7ded8" rx="4"/>']
-    if key in {"decoherence_boundary_candidate", "sequence_regime_boundary_candidate"}:
+    if key in {"sequence_regime_boundary_candidate"}:
         parts.extend(
             [
                 f'<rect x="{x + 12}" y="{y + 22}" width="92" height="24" fill="#426b69" opacity="0.25"/>',
@@ -422,13 +422,11 @@ def _primitive_symbol(primitive: str, x: float, y: float) -> list[str]:
                 f'<path d="M {x + 122} {y + 36} C {x + 144} {y + 44}, {x + 168} {y + 44}, {x + 198} {y + 32}" fill="none" stroke="#65736f" stroke-dasharray="4 4"/>',
             ]
         )
-    elif key == "criticality_tuner_candidate":
+    elif key == "periodic_spacing_grammar_candidate":
         parts.extend(
             [
-                f'<line x1="{x + 24}" y1="{y + 66}" x2="{x + 220}" y2="{y + 66}" stroke="#65736f"/>',
-                f'<line x1="{x + 24}" y1="{y + 66}" x2="{x + 24}" y2="{y + 12}" stroke="#65736f"/>',
-                f'<path d="M {x + 26} {y + 62} C {x + 78} {y + 62}, {x + 102} {y + 58}, {x + 118} {y + 38} C {x + 134} {y + 16}, {x + 166} {y + 14}, {x + 218} {y + 14}" fill="none" stroke="#7b4b73" stroke-width="3"/>',
-                f'<line x1="{x + 118}" y1="{y + 10}" x2="{x + 118}" y2="{y + 70}" stroke="#c6912f" stroke-dasharray="4 3"/>',
+                f'<path d="M {x + 24} {y + 50} L {x + 42} {y + 50} L {x + 42} {y + 22} L {x + 52} {y + 22} L {x + 52} {y + 50} L {x + 82} {y + 50} L {x + 82} {y + 22} L {x + 92} {y + 22} L {x + 92} {y + 50} L {x + 122} {y + 50} L {x + 122} {y + 22} L {x + 132} {y + 22} L {x + 132} {y + 50}" fill="none" stroke="#426b69" stroke-width="2"/>',
+                f'<path d="M {x + 24} {y + 68} C {x + 60} {y + 68}, {x + 74} {y + 34}, {x + 104} {y + 34} C {x + 138} {y + 34}, {x + 154} {y + 68}, {x + 218} {y + 68}" fill="none" stroke="#7b4b73" stroke-width="3"/>',
             ]
         )
     elif key == "replication_instability_candidate":
@@ -440,19 +438,14 @@ def _primitive_symbol(primitive: str, x: float, y: float) -> list[str]:
                 f'<path d="M {x + 146} {y + 28} C {x + 132} {y + 10}, {x + 168} {y + 10}, {x + 154} {y + 28}" fill="none" stroke="#9b5f3f"/>',
             ]
         )
-    elif key == "resonant_pulse_decoder_candidate":
+    elif key == "asymmetric_repeat_architecture_candidate":
         parts.extend(
             [
-                f'<path d="M {x + 24} {y + 50} L {x + 42} {y + 50} L {x + 42} {y + 22} L {x + 52} {y + 22} L {x + 52} {y + 50} L {x + 82} {y + 50} L {x + 82} {y + 22} L {x + 92} {y + 22} L {x + 92} {y + 50} L {x + 122} {y + 50} L {x + 122} {y + 22} L {x + 132} {y + 22} L {x + 132} {y + 50}" fill="none" stroke="#426b69" stroke-width="2"/>',
-                f'<path d="M {x + 24} {y + 68} C {x + 60} {y + 68}, {x + 74} {y + 34}, {x + 104} {y + 34} C {x + 138} {y + 34}, {x + 154} {y + 68}, {x + 218} {y + 68}" fill="none" stroke="#7b4b73" stroke-width="3"/>',
-            ]
-        )
-    elif key == "hysteresis_candidate":
-        parts.extend(
-            [
-                f'<line x1="{x + 36}" y1="{y + 66}" x2="{x + 214}" y2="{y + 66}" stroke="#65736f"/>',
-                f'<line x1="{x + 36}" y1="{y + 66}" x2="{x + 36}" y2="{y + 14}" stroke="#65736f"/>',
-                f'<path d="M {x + 46} {y + 56} C {x + 86} {y + 10}, {x + 168} {y + 10}, {x + 204} {y + 56} C {x + 160} {y + 38}, {x + 96} {y + 38}, {x + 46} {y + 56}" fill="none" stroke="#7b4b73" stroke-width="3"/>',
+                f'<rect x="{x + 24}" y="{y + 18}" width="88" height="52" fill="#426b69" opacity="0.2" stroke="#426b69"/>',
+                f'<rect x="{x + 40}" y="{y + 30}" width="56" height="28" fill="#426b69" opacity="0.25" stroke="#426b69"/>',
+                f'<rect x="{x + 132}" y="{y + 18}" width="88" height="52" fill="#7b4b73" opacity="0.2" stroke="#7b4b73"/>',
+                f'<rect x="{x + 148}" y="{y + 30}" width="28" height="28" fill="#7b4b73" opacity="0.35" stroke="#7b4b73"/>',
+                f'<line x1="{x + 118}" y1="{y + 10}" x2="{x + 118}" y2="{y + 76}" stroke="#c6912f" stroke-width="2"/>',
             ]
         )
     elif key == "negative_space_element_candidate":
@@ -493,27 +486,6 @@ def _primitive_symbol(primitive: str, x: float, y: float) -> list[str]:
         for idx, color in enumerate(["#426b69", "#7b4b73", "#9b5f3f", "#3f6b8f"]):
             parts.append(f'<rect x="{x + 28 + idx * 48}" y="{y + 30}" width="42" height="28" fill="{color}" opacity="0.35" stroke="{color}"/>')
         parts.append(f'<path d="M {x + 50} {y + 24} C {x + 88} {y + 8}, {x + 134} {y + 8}, {x + 188} {y + 24}" fill="none" stroke="#65736f" stroke-dasharray="4 4"/>')
-    elif key == "possibility_gate_candidate":
-        parts.extend(
-            [
-                f'<circle cx="{x + 46}" cy="{y + 44}" r="12" fill="#426b69" opacity="0.35"/>',
-                f'<line x1="{x + 58}" y1="{y + 44}" x2="{x + 124}" y2="{y + 24}" stroke="#65736f"/>',
-                f'<line x1="{x + 58}" y1="{y + 44}" x2="{x + 124}" y2="{y + 44}" stroke="#65736f"/>',
-                f'<line x1="{x + 58}" y1="{y + 44}" x2="{x + 124}" y2="{y + 64}" stroke="#65736f"/>',
-                f'<rect x="{x + 126}" y="{y + 18}" width="18" height="52" fill="#fff5d9" stroke="#c6912f"/>',
-                f'<circle cx="{x + 184}" cy="{y + 24}" r="9" fill="#7b4b73" opacity="0.25"/>',
-                f'<circle cx="{x + 184}" cy="{y + 44}" r="9" fill="#7b4b73" opacity="0.25"/>',
-                f'<circle cx="{x + 184}" cy="{y + 64}" r="9" fill="#7b4b73" opacity="0.25"/>',
-            ]
-        )
-    elif key == "chromatin_motion_oscillator_candidate":
-        parts.extend(
-            [
-                f'<path d="M {x + 28} {y + 46} C {x + 58} {y + 16}, {x + 92} {y + 76}, {x + 124} {y + 46} C {x + 154} {y + 16}, {x + 188} {y + 76}, {x + 218} {y + 46}" fill="none" stroke="#7b4b73" stroke-width="3"/>',
-                f'<circle cx="{x + 126}" cy="{y + 46}" r="8" fill="#426b69"/>',
-                f'<circle cx="{x + 126}" cy="{y + 46}" r="22" fill="none" stroke="#426b69" stroke-dasharray="3 4"/>',
-            ]
-        )
     else:
         parts.extend(
             [

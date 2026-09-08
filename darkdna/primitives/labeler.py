@@ -14,28 +14,11 @@ import numpy as np
 import pandas as pd
 
 from darkdna.features.classical import artifact_risk_score
+from darkdna.primitives.ontology import get_primitive
 from darkdna.utils.progress import ProgressReporter
 from darkdna.utils.stats import optional_float
 from .assay_recommender import recommend_assay
 
-
-SCORE_TO_PRIMITIVE = {
-    "fractal_scaffold_candidate_score": "fractal_scaffold_candidate",
-    "constraint_grammar_region_candidate_score": "constraint_grammar_region_candidate",
-    "non_B_DNA_physical_susceptibility_candidate_score": "non_B_DNA_physical_susceptibility_candidate",
-    "quantum_susceptible_domain_candidate_score": "non_B_DNA_physical_susceptibility_candidate",
-    "replication_instability_candidate_score": "replication_instability_candidate",
-    "decoherence_boundary_candidate_score": "decoherence_boundary_candidate",
-    "resonant_pulse_decoder_candidate_score": "resonant_pulse_decoder_candidate",
-    "hysteresis_candidate_score": "hysteresis_candidate",
-    "possibility_gate_candidate_score": "possibility_gate_candidate",
-    "criticality_tuner_candidate_score": "criticality_tuner_candidate",
-    "chromatin_motion_oscillator_candidate_score": "chromatin_motion_oscillator_candidate",
-    "negative_space_element_candidate_score": "negative_space_element_candidate",
-    "sequence_regime_boundary_candidate_score": "sequence_regime_boundary_candidate",
-    "TE_grammar_node_candidate_score": "TE_grammar_node_candidate",
-    "unexplained_dark_anomaly_candidate_score": "unexplained_dark_anomaly_candidate",
-}
 
 UNEXPLAINED = "unexplained_dark_anomaly_candidate"
 
@@ -44,12 +27,8 @@ DOMINANCE_FEATURES = {
     "constraint_grammar_region_candidate": ["grammar_entropy", "Markov_order_anomaly", "motif_like_token_recurrence"],
     "non_B_DNA_physical_susceptibility_candidate": ["G4_sequence_potential", "Z_DNA_sequence_potential", "R_loop_susceptibility_sequence_potential", "charge_oxidation_susceptibility_score"],
     "replication_instability_candidate": ["fork_texture_score", "simple_repeat_fraction", "palindrome_density"],
-    "decoherence_boundary_candidate": ["decoherence_boundary_candidate_score", "entropy_boundary_score"],
-    "resonant_pulse_decoder_candidate": ["phase_periodicity_around_10bp", "spacing_periodicity_fourier_power"],
-    "hysteresis_candidate": ["left_right_GC_asymmetry", "nested_repeat_architecture_score", "G4_sequence_potential", "Z_DNA_sequence_potential"],
-    "possibility_gate_candidate": ["boundary_condition_candidate_score", "negative_space_boundary_score", "forbidden_word_depletion_enrichment"],
-    "criticality_tuner_candidate": ["entropy_boundary_score", "compression_boundary_score", "local_feature_transition_score"],
-    "chromatin_motion_oscillator_candidate": ["spacing_periodicity_autocorrelation", "DNA_bendability_proxy", "left_right_entropy_asymmetry"],
+    "periodic_spacing_grammar_candidate": ["phase_periodicity_around_10bp", "spacing_periodicity_fourier_power", "spacing_periodicity_autocorrelation"],
+    "asymmetric_repeat_architecture_candidate": ["left_right_GC_asymmetry", "nested_repeat_architecture_score", "orientation_bias_of_recurrent_kmers"],
     "negative_space_element_candidate": ["depleted_kmer_score", "unexpected_silence_score"],
     "sequence_regime_boundary_candidate": ["boundary_condition_candidate_score", "left_right_regime_difference_score"],
     "TE_grammar_node_candidate": ["TE_family_mosaic_score", "TE_boundary_score", "TE_overlap_fraction"],
@@ -212,7 +191,7 @@ def assign_primitive_labels(
         metadata_fallback: dict | None = None
         fallback_rank = -math.inf
         for _, record in group.iterrows():
-            primitive = SCORE_TO_PRIMITIVE.get(record["primitive"], UNEXPLAINED)
+            primitive = get_primitive(str(record["primitive"])).candidate_name
             rz = _finite_number(record.get("residual_zscore"))
             nz = _finite_number(record.get("matched_null_zscore"))
             empirical_p = _finite_number(record.get("empirical_p_value"))
@@ -243,6 +222,12 @@ def assign_primitive_labels(
                 metadata_fallback = candidate
             if _survives_thresholds(rz, nz, residual_threshold, matched_null_threshold):
                 survivors.append(candidate)
+        collapsed: dict[str, dict] = {}
+        for item in survivors:
+            current = collapsed.get(item["primitive"])
+            if current is None or (np.isfinite(item["rank"]) and (not np.isfinite(current["rank"]) or item["rank"] > current["rank"])):
+                collapsed[item["primitive"]] = item
+        survivors = list(collapsed.values())
         specific = [item for item in survivors if item["primitive"] != UNEXPLAINED]
         if specific:
             selected = sorted(specific, key=lambda item: (-item["rank"] if np.isfinite(item["rank"]) else math.inf, item["primitive"]))

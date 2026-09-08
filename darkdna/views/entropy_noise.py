@@ -22,5 +22,5 @@ def compute_entropy_noise_view(row: dict) -> dict[str, float]:
         "entropy_noise_compression_anomaly_score": compression,
         "entropy_asymmetry_score": entropy_asym,
         "feature_void_score": void,
-        "decoherence_boundary_candidate_score": decoherence,
+        "entropy_noise_boundary_score": decoherence,
     }

@@ -18,11 +18,8 @@ def test_prompt1_candidate_only_labels():
         "contextual_operator",
     }
     allowed_candidates = {
-        "hysteresis_candidate",
-        "resonant_pulse_decoder_candidate",
-        "possibility_gate_candidate",
-        "criticality_tuner_candidate",
-        "chromatin_motion_oscillator_candidate",
+        "asymmetric_repeat_architecture_candidate",
+        "periodic_spacing_grammar_candidate",
         "replication_instability_candidate",
         "non_B_DNA_physical_susceptibility_candidate",
         "sequence_regime_boundary_candidate",
@@ -30,13 +27,20 @@ def test_prompt1_candidate_only_labels():
         "TE_grammar_node_candidate",
         "fractal_scaffold_candidate",
         "constraint_grammar_region_candidate",
-        "decoherence_boundary_candidate",
         "unexplained_dark_anomaly_candidate",
     }
     names = set(primitive_names())
     assert forbidden_confirmed.isdisjoint(names)
     assert allowed_candidates.issubset(names)
-    assert "quantum_susceptible_domain_candidate" not in names
+    assert {
+        "hysteresis_candidate",
+        "resonant_pulse_decoder_candidate",
+        "possibility_gate_candidate",
+        "criticality_tuner_candidate",
+        "chromatin_motion_oscillator_candidate",
+        "decoherence_boundary_candidate",
+        "quantum_susceptible_domain_candidate",
+    }.isdisjoint(names)
 
 
 def test_sequence_only_commands_do_not_emit_prompt2_dynamic_scores():

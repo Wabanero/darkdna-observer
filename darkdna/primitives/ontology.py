@@ -72,77 +72,29 @@ PRIMITIVES: dict[str, PrimitiveClass] = {
         "Do not claim replication instability without replication assays.",
         "replication fork texture / stress assay view",
     ),
-    "chromatin_motion_oscillator": PrimitiveClass(
-        "chromatin_motion_oscillator",
-        "chromatin_motion_oscillator_candidate",
-        "chromatin_motion_oscillator",
-        "live_locus_motion_or_spatial_dynamics",
+    "periodic_spacing_grammar": PrimitiveClass(
+        "periodic_spacing_grammar",
+        "periodic_spacing_grammar_candidate",
+        "periodic_spacing_grammar",
+        "sequence_plus_matched_nulls_and_phase_scramble_assay",
         True,
-        True,
-        "Static sequence architecture that motivates locus-motion or spatial-dynamics testing.",
-        "Sequence architecture compatible with possible spatial-dynamics or motion-response hypotheses.",
-        "Do not claim oscillatory chromatin behavior from static sequence.",
-        "live-locus motion / spatial dynamics view",
+        False,
+        "Helical, nucleosome-scale, or spacing periodicity that remains anomalous after composition controls.",
+        "Sequence architecture compatible with periodic spacing or phasing hypotheses.",
+        "Do not claim pulse decoding, frequency response, or chromatin motion from static sequence.",
+        "temporal pulse / live-locus motion view after an intermediate molecular bridge",
     ),
-    "decoherence_boundary": PrimitiveClass(
-        "decoherence_boundary",
-        "decoherence_boundary_candidate",
-        "decoherence_boundary",
-        "single_cell_variance_or_noise_propagation_assay",
+    "asymmetric_repeat_architecture": PrimitiveClass(
+        "asymmetric_repeat_architecture",
+        "asymmetric_repeat_architecture_candidate",
+        "asymmetric_repeat_architecture",
+        "sequence_plus_matched_nulls_and_orientation_or_repeat_assay",
         True,
-        True,
-        "Entropy/noise or sequence-regime boundary proxy that motivates noise-propagation tests.",
-        "Sequence architecture compatible with possible variance/noise boundary behavior.",
-        "Do not claim physical decoherence or confirmed noise insulation from static sequence.",
-        "single-cell variance/noise propagation view",
-    ),
-    "hysteresis": PrimitiveClass(
-        "hysteresis",
-        "hysteresis_candidate",
-        "hysteresis_element",
-        "perturbation_timecourse_or_recovery",
-        True,
-        True,
-        "Asymmetry, repeat architecture, and non-B propensity compatible with history-dependent perturbation tests.",
-        "Sequence architecture compatible with possible memory-like or metastable behavior.",
-        "Do not claim actual hysteresis or memory from static sequence.",
-        "timecourse_recovery / hysteresis view",
-    ),
-    "resonant_pulse_decoder": PrimitiveClass(
-        "resonant_pulse_decoder",
-        "resonant_pulse_decoder_candidate",
-        "resonant_pulse_decoder",
-        "temporal_pulse_assay_or_timecourse",
-        True,
-        True,
-        "Periodic, phase, or spacing grammar compatible with temporal pulse perturbation tests.",
-        "Periodic/phase/spacing grammar compatible with pulse-decoding hypotheses.",
-        "Do not claim frequency decoding from sequence alone.",
-        "temporal pulse / timecourse view",
-    ),
-    "possibility_gate": PrimitiveClass(
-        "possibility_gate",
-        "possibility_gate_candidate",
-        "possibility_gate",
-        "state_transition_graph_or_pseudotime",
-        True,
-        True,
-        "Boundary or constraint-like sequence architecture compatible with future state-transition tests.",
-        "Sequence architecture compatible with boundary/constraint-like behavior.",
-        "Do not claim future-state bias or reachable-state modulation from static sequence.",
-        "state_transition / constructor view",
-    ),
-    "criticality_tuner": PrimitiveClass(
-        "criticality_tuner",
-        "criticality_tuner_candidate",
-        "criticality_tuner",
-        "dose_gradient_timecourse_or_pseudotime",
-        True,
-        True,
-        "Sequence-regime boundary or entropy/compression transition compatible with threshold-like hypotheses.",
-        "Sequence-regime boundary or entropy/compression transition compatible with threshold-like hypotheses.",
-        "Do not claim biological criticality or transition threshold shift from sequence alone.",
-        "criticality / dose-gradient view",
+        False,
+        "Left/right composition asymmetry, nested repeats, or recurrent-k-mer orientation remaining after controls.",
+        "Sequence architecture compatible with oriented or nested repeat hypotheses.",
+        "Do not claim hysteresis, memory, or history-dependent response from static sequence.",
+        "timecourse recovery / hysteresis view after an intermediate molecular bridge",
     ),
     "negative_space_element": PrimitiveClass(
         "negative_space_element",
@@ -195,14 +147,55 @@ PRIMITIVES: dict[str, PrimitiveClass] = {
 }
 
 
+# Retired Mode E identity labels. Static sequence can motivate a later assay
+# hypothesis, but these names are not architecture classes and must not appear
+# as primary primitive labels.
+LEGACY_PRIMITIVE_ALIASES: dict[str, str] = {
+    "periodic_spacing_grammar_candidate_score": "periodic_spacing_grammar",
+    "asymmetric_repeat_architecture_candidate_score": "asymmetric_repeat_architecture",
+    "hysteresis": "asymmetric_repeat_architecture",
+    "hysteresis_candidate": "asymmetric_repeat_architecture",
+    "hysteresis_element": "asymmetric_repeat_architecture",
+    "hysteresis_candidate_score": "asymmetric_repeat_architecture",
+    "resonant_pulse_decoder": "periodic_spacing_grammar",
+    "resonant_pulse_decoder_candidate": "periodic_spacing_grammar",
+    "resonant_pulse_decoder_candidate_score": "periodic_spacing_grammar",
+    "chromatin_motion_oscillator": "periodic_spacing_grammar",
+    "chromatin_motion_oscillator_candidate": "periodic_spacing_grammar",
+    "chromatin_motion_oscillator_candidate_score": "periodic_spacing_grammar",
+    "decoherence_boundary": "sequence_regime_boundary",
+    "decoherence_boundary_candidate": "sequence_regime_boundary",
+    "decoherence_boundary_candidate_score": "sequence_regime_boundary",
+    "possibility_gate": "sequence_regime_boundary",
+    "possibility_gate_candidate": "sequence_regime_boundary",
+    "possibility_gate_candidate_score": "sequence_regime_boundary",
+    "criticality_tuner": "sequence_regime_boundary",
+    "criticality_tuner_candidate": "sequence_regime_boundary",
+    "criticality_tuner_candidate_score": "sequence_regime_boundary",
+    "quantum_susceptible_domain": "non_B_DNA_physical_susceptibility",
+    "quantum_susceptible_domain_candidate": "non_B_DNA_physical_susceptibility",
+    "quantum_susceptible_domain_candidate_score": "non_B_DNA_physical_susceptibility",
+}
+
+MODE_E_IDENTITY_LABELS = frozenset(
+    {
+        "hysteresis_candidate",
+        "resonant_pulse_decoder_candidate",
+        "possibility_gate_candidate",
+        "criticality_tuner_candidate",
+        "chromatin_motion_oscillator_candidate",
+        "decoherence_boundary_candidate",
+    }
+)
+
+
 _ALIASES: dict[str, str] = {}
 for key, primitive in PRIMITIVES.items():
     _ALIASES[key] = key
     _ALIASES[primitive.candidate_name] = key
     _ALIASES[primitive.confirmed_name] = key
-_ALIASES["quantum_susceptible_domain"] = "non_B_DNA_physical_susceptibility"
-_ALIASES["quantum_susceptible_domain_candidate"] = "non_B_DNA_physical_susceptibility"
-_ALIASES["quantum_susceptible_domain_candidate_score"] = "non_B_DNA_physical_susceptibility"
+    _ALIASES[f"{primitive.candidate_name}_score"] = key
+_ALIASES.update(LEGACY_PRIMITIVE_ALIASES)
 
 
 def primitive_names() -> list[str]:

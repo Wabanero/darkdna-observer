@@ -16,7 +16,7 @@ def test_genome_browser_tracks_are_written(tmp_path):
     labels = pd.DataFrame(
         {
             "region_id": ["r1", "r2"],
-            "primitive_class": ["negative_space_element_candidate", "criticality_tuner_candidate"],
+            "primitive_class": ["negative_space_element_candidate", "sequence_regime_boundary_candidate"],
             "primitive_confidence": [0.9, 0.8],
         }
     )
@@ -24,6 +24,6 @@ def test_genome_browser_tracks_are_written(tmp_path):
     paths = make_tracks(windows, labels, residuals, tmp_path)
     assert paths["all_residual_scores"].exists()
     assert paths["negative_space_element_candidate"].exists()
-    assert paths["criticality_tuner_candidate"].exists()
-    assert (tmp_path / "criticality_tuner_candidates.bed").exists()
+    assert paths["sequence_regime_boundary_candidate"].exists()
+    assert (tmp_path / "sequence_regime_boundary_candidates.bed").exists()
     assert paths["artifact_risk_flags"].exists()

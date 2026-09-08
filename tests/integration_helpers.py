@@ -9,6 +9,7 @@ import yaml
 from typer.testing import CliRunner
 
 from darkdna.cli import app
+from darkdna.primitives.ontology import MODE_E_IDENTITY_LABELS
 
 
 CONFIRMED_FORBIDDEN_LABELS = {
@@ -105,6 +106,7 @@ def assert_pipeline_outputs(outdir: Path) -> None:
         "scale_validation_status",
     }.issubset(loci.columns)
     assert CONFIRMED_FORBIDDEN_LABELS.isdisjoint(set(labels["primitive_class"].dropna()))
+    assert MODE_E_IDENTITY_LABELS.isdisjoint(set(labels["primitive_class"].dropna()))
     for label in labels["primitive_class"].dropna().unique():
         assert label == "no_call" or label.endswith("_candidate")
     assert cards

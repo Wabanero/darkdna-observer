@@ -28,12 +28,8 @@ PRIMITIVE_SCORE_COLUMNS = [
     "constraint_grammar_region_candidate_score",
     "non_B_DNA_physical_susceptibility_candidate_score",
     "replication_instability_candidate_score",
-    "decoherence_boundary_candidate_score",
-    "resonant_pulse_decoder_candidate_score",
-    "hysteresis_candidate_score",
-    "possibility_gate_candidate_score",
-    "criticality_tuner_candidate_score",
-    "chromatin_motion_oscillator_candidate_score",
+    "periodic_spacing_grammar_candidate_score",
+    "asymmetric_repeat_architecture_candidate_score",
     "negative_space_element_candidate_score",
     "sequence_regime_boundary_candidate_score",
     "TE_grammar_node_candidate_score",
@@ -65,32 +61,16 @@ PRIMITIVE_SCORE_COMPONENTS: dict[str, list[str]] = {
         "R_loop_susceptibility_sequence_potential",
     ],
     "replication_instability_candidate_score": ["fork_texture_score"],
-    "decoherence_boundary_candidate_score": ["decoherence_boundary_candidate_score"],
-    "resonant_pulse_decoder_candidate_score": [
+    "periodic_spacing_grammar_candidate_score": [
         "phase_periodicity_around_10bp",
         "nucleosome_scale_periodicity_around_147bp",
         "spacing_periodicity_fourier_power",
+        "spacing_periodicity_autocorrelation",
     ],
-    "hysteresis_candidate_score": [
+    "asymmetric_repeat_architecture_candidate_score": [
         "abs(left_right_GC_asymmetry)",
         "nested_repeat_architecture_score",
-        "max_nonb_sequence_potential",
         "orientation_bias_of_recurrent_kmers",
-    ],
-    "possibility_gate_candidate_score": [
-        "boundary_condition_candidate_score",
-        "negative_space_element_candidate_score",
-        "forbidden_word_depletion_enrichment",
-    ],
-    "criticality_tuner_candidate_score": [
-        "boundary_condition_candidate_score",
-        "entropy_boundary_score",
-        "compression_boundary_score",
-    ],
-    "chromatin_motion_oscillator_candidate_score": [
-        "spacing_periodicity_autocorrelation",
-        "legacy_dinucleotide_bendability_screen",
-        "left_right_entropy_asymmetry",
     ],
     "negative_space_element_candidate_score": [
         "depleted_kmer_score",
@@ -232,19 +212,14 @@ def primitive_scores_for_row(row: dict) -> dict[str, float]:
         "constraint_grammar_region_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["constraint_grammar_region_candidate_score"]]),
         "non_B_DNA_physical_susceptibility_candidate_score": _finite_max(physical_values),
         "replication_instability_candidate_score": value(enriched, "fork_texture_score"),
-        "decoherence_boundary_candidate_score": value(enriched, "decoherence_boundary_candidate_score"),
-        "resonant_pulse_decoder_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["resonant_pulse_decoder_candidate_score"]]),
-        "hysteresis_candidate_score": _finite_mean(
+        "periodic_spacing_grammar_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["periodic_spacing_grammar_candidate_score"]]),
+        "asymmetric_repeat_architecture_candidate_score": _finite_mean(
             [
                 abs(value(enriched, "left_right_GC_asymmetry")),
                 value(enriched, "nested_repeat_architecture_score"),
-                value(enriched, "max_nonb_sequence_potential"),
                 value(enriched, "orientation_bias_of_recurrent_kmers"),
             ]
         ),
-        "possibility_gate_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["possibility_gate_candidate_score"]]),
-        "criticality_tuner_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["criticality_tuner_candidate_score"]]),
-        "chromatin_motion_oscillator_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["chromatin_motion_oscillator_candidate_score"]]),
         "negative_space_element_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["negative_space_element_candidate_score"]]),
         "sequence_regime_boundary_candidate_score": value(enriched, "boundary_condition_candidate_score"),
         "TE_grammar_node_candidate_score": _finite_mean([value(enriched, feature) for feature in PRIMITIVE_SCORE_COMPONENTS["TE_grammar_node_candidate_score"]]),

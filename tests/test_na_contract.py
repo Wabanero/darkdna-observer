@@ -21,12 +21,12 @@ def test_optional_float_preserves_measured_zero_and_keeps_missing_as_na():
 
 def test_entropy_and_boundary_views_do_not_convert_missing_inputs_to_zero():
     empty = compute_entropy_noise_view({})
-    assert math.isnan(empty["decoherence_boundary_candidate_score"])
+    assert math.isnan(empty["entropy_noise_boundary_score"])
     assert math.isnan(empty["entropy_cliff_score"])
 
     measured_zero = compute_entropy_noise_view({"entropy_boundary_score": 0.0})
     assert measured_zero["entropy_cliff_score"] == 0.0
-    assert measured_zero["decoherence_boundary_candidate_score"] == 0.0
+    assert measured_zero["entropy_noise_boundary_score"] == 0.0
     assert math.isnan(measured_zero["feature_void_score"])
 
     boundary = compute_boundary_condition_view({"entropy_boundary_score": 1.5})

@@ -205,7 +205,7 @@ def test_region_cards_keep_observed_features_separate_from_hypothesis():
     assert card["candidate_only"] is True
 
 
-def test_resonant_candidate_requires_intermediate_mechanistic_bridge():
+def test_periodic_spacing_candidate_requires_intermediate_mechanistic_bridge():
     windows = pd.DataFrame(
         {
             "region_id": ["r1"],
@@ -221,7 +221,7 @@ def test_resonant_candidate_requires_intermediate_mechanistic_bridge():
     labels = pd.DataFrame(
         {
             "region_id": ["r1"],
-            "primitive_class": ["resonant_pulse_decoder_candidate"],
+            "primitive_class": ["periodic_spacing_grammar_candidate"],
             "primitive_confidence": [0.8],
             "top_supporting_features": ["phase_periodicity_around_10bp"],
         }
@@ -229,7 +229,7 @@ def test_resonant_candidate_requires_intermediate_mechanistic_bridge():
     residuals = pd.DataFrame(
         {
             "region_id": ["r1"],
-            "primitive": ["resonant_pulse_decoder_candidate_score"],
+            "primitive": ["periodic_spacing_grammar_candidate_score"],
             "observed_score": [2.0],
             "residual_zscore": [3.0],
             "matched_null_zscore": [2.5],
@@ -243,10 +243,11 @@ def test_resonant_candidate_requires_intermediate_mechanistic_bridge():
     bridge = card["mechanistic_bridge"]
 
     assert "10 bp/147 bp periodicity" in bridge["measured_feature"]
-    assert "frequency- or pulse-specific response" == bridge["proposed_dynamic_phenotype"]
+    assert "spacing-dependent molecular readout" in bridge["proposed_dynamic_phenotype"]
     assert "nucleosome phasing" in bridge["candidate_intermediate_processes"]
     assert "TF cooperative binding at phased spacing" in bridge["candidate_intermediate_processes"]
     assert "show periodicity affects an intermediate molecular process" in bridge["required_bridge_evidence"]
+    assert "pulse decoding" in " ".join(bridge["required_bridge_evidence"])
     assert bridge["direct_primitive_validation_allowed"] is False
     assert "exploratory_only" in card["assay_validation_scope"]
 

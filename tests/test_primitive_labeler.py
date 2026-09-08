@@ -132,3 +132,23 @@ def test_labeler_keeps_unavailable_zscores_as_na_and_does_not_treat_them_as_zero
     assert labels.loc["r2", "primitive_class"] == "no_call"
     assert labels.loc["r2", "residual_zscore"] == 0.4
     assert labels.loc["r2", "matched_null_zscore"] == 0.3
+
+
+def test_labeler_maps_mode_e_score_names_onto_one_architecture_class():
+    residuals = pd.DataFrame(
+        {
+            "region_id": ["r1", "r1", "r1"],
+            "primitive": [
+                "decoherence_boundary_candidate_score",
+                "possibility_gate_candidate_score",
+                "sequence_regime_boundary_candidate_score",
+            ],
+            "residual_zscore": [2.5, 2.8, 3.1],
+            "matched_null_zscore": [2.2, 2.4, 2.6],
+        }
+    )
+
+    labels = assign_primitive_labels(residuals)
+    assert list(labels["primitive_class"]) == ["sequence_regime_boundary_candidate"]
+    assert labels.iloc[0]["labeling_status"] == "single_surviving_class"
+    assert labels.iloc[0]["competing_primitive_count"] == 1
