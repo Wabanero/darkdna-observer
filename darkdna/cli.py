@@ -301,6 +301,7 @@ def run_config_pipeline(
         on="region_id",
         how="left",
     )
+    sequences, _ = interval_sequences(windows_df, require_configured_path(fasta, "FASTA"))
     nulls_df = build_matched_null_models(
         scores_df,
         null_feature_table,
@@ -308,6 +309,10 @@ def run_config_pipeline(
         block_size_bp=cfg.null_models.block_size_bp,
         minimum_independent_blocks=cfg.null_models.minimum_independent_blocks,
         agreement_z_threshold=cfg.null_models.agreement_z_threshold,
+        sequences=sequences,
+        n_sequence_surrogates=cfg.null_models.n_sequence_surrogates,
+        seed=cfg.random_seed,
+        kmer_size=cfg.null_models.sequence_kmer_size,
         progress=True,
     )
     null_path = write_matched_nulls(nulls_df, outdir)
@@ -566,6 +571,15 @@ def build_null_models_cmd(
     n_controls = n_controls if n_controls is not None else cfg.n_null
     score_table = read_table(scores)
     feature_table = read_table(features)
+    windows_path = outdir / "dark_windows.parquet"
+    fasta = cfg_path(config, cfg, "fasta")
+    sequences: dict[str, str] | None = None
+    if fasta is not None and fasta.exists():
+        coords = feature_table if {"chrom", "start", "end"}.issubset(feature_table.columns) else (
+            read_table(windows_path) if windows_path.exists() else feature_table
+        )
+        if {"chrom", "start", "end", "region_id"}.issubset(coords.columns):
+            sequences, _ = interval_sequences(coords, fasta)
     nulls = build_matched_null_models(
         score_table,
         feature_table,
@@ -573,6 +587,10 @@ def build_null_models_cmd(
         block_size_bp=cfg.null_models.block_size_bp,
         minimum_independent_blocks=cfg.null_models.minimum_independent_blocks,
         agreement_z_threshold=cfg.null_models.agreement_z_threshold,
+        sequences=sequences,
+        n_sequence_surrogates=cfg.null_models.n_sequence_surrogates,
+        seed=cfg.random_seed,
+        kmer_size=cfg.null_models.sequence_kmer_size,
         progress=True,
     )
     path = write_matched_nulls(nulls, outdir)

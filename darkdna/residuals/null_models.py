@@ -1,8 +1,8 @@
-"""Matched null model generation and summaries.
+"""Matched genomic controls plus candidate-level sequence-transform nulls.
 
-The current implementation provides a first matched-control null. It also
-emits a registry of required complementary nulls so downstream reports do not
-mistake one z-score for a severe null panel.
+Genomic matching is a covariate control. Reverse, dinucleotide, k-mer, and
+evolutionary-process families test whether the exact interval sequence is
+unusual and enter promotion when they are fully calibrated.
 """
 
 from __future__ import annotations
@@ -35,12 +35,12 @@ NULL_MODEL_REGISTRY: list[dict[str, str]] = [
     },
     {
         "null_model_id": "dinucleotide_preserving_shuffle",
-        "status": "helper_available_not_pipeline_integrated",
+        "status": "candidate_level_when_sequence_available",
         "description": "Synthetic sequence shuffle preserving much dinucleotide texture.",
     },
     {
         "null_model_id": "kmer_preserving_shuffle",
-        "status": "helper_available_not_pipeline_integrated",
+        "status": "candidate_level_when_sequence_available",
         "description": "Synthetic sequence shuffle preserving local k-mer blocks.",
     },
     {
@@ -85,7 +85,7 @@ NULL_MODEL_REGISTRY: list[dict[str, str]] = [
     },
     {
         "null_model_id": "reversed_or_synthetic_sequences",
-        "status": "not_pipeline_integrated",
+        "status": "candidate_level_when_sequence_available",
         "description": "Reverse, scrambled, or synthetic controls for transformation robustness.",
     },
 ]
@@ -109,7 +109,17 @@ def null_model_registry() -> list[dict[str, str]]:
 
 def null_panel_status() -> dict:
     assessed = assess_null_availability(())
-    implemented = ["matched_controls_v1"]
+    implemented = [
+        "matched_controls_v1",
+        "dinucleotide_preserving_shuffle",
+        "kmer_preserving_shuffle",
+        "mononucleotide_preserving",
+        "markov_chain_surrogate",
+        "reversed_sequence",
+        "reverse_complement",
+        "synthetic_equal_composition",
+        "evolutionary_process_generated",
+    ]
     not_fully_implemented = [str(item["null_model_id"]) for item in assessed if not item["available"]]
     if "syntenic_ortholog_controls" not in not_fully_implemented:
         not_fully_implemented.append("syntenic_ortholog_controls")
@@ -225,6 +235,10 @@ def build_matched_null_models(
     block_size_bp: int = 100_000,
     minimum_independent_blocks: int = 5,
     agreement_z_threshold: float = 2.0,
+    sequences: dict[str, str] | None = None,
+    n_sequence_surrogates: int = 8,
+    seed: int = 13,
+    kmer_size: int = 3,
     progress: bool = False,
 ) -> pd.DataFrame:
     features = features if features is not None and not features.empty else scores[["region_id"]].copy()
@@ -232,7 +246,7 @@ def build_matched_null_models(
         features = scores[["region_id"]].copy()
     reporter = ProgressReporter("build-null-models", total=1) if progress else None
     if reporter:
-        reporter.start(f"severe block-aware panel n_controls={n_controls}")
+        reporter.start(f"severe block-aware panel n_controls={n_controls} sequence_surrogates={n_sequence_surrogates}")
     summary, details = build_severe_null_panel(
         scores,
         features,
@@ -241,6 +255,10 @@ def build_matched_null_models(
         minimum_independent_blocks=minimum_independent_blocks,
         agreement_z_threshold=agreement_z_threshold,
         score_columns=[column for column in PRIMITIVE_SCORE_COLUMNS if column in scores.columns],
+        sequences=sequences,
+        n_sequence_surrogates=n_sequence_surrogates,
+        seed=seed,
+        kmer_size=kmer_size,
     )
     summary.attrs["null_details"] = details
     if reporter:

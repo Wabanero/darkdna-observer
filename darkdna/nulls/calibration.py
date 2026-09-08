@@ -9,6 +9,11 @@ import numpy as np
 import pandas as pd
 
 from darkdna.nulls.registry import assess_null_availability
+from darkdna.nulls.sequence_calibration import (
+    SEQUENCE_NULL_MODEL_IDS,
+    build_sequence_transform_null_details,
+    sequences_from_feature_table,
+)
 from darkdna.utils.stats import empirical_p_value
 
 
@@ -35,6 +40,9 @@ MATCH_COLUMNS: dict[str, tuple[str, ...]] = {
 
 
 EXACT_MATCH_COLUMNS = {"TE_family", "TE_subfamily", "chromatin_compartment", "synteny_group", "damage_environment"}
+
+
+FULLY_CALIBRATED_STATUSES = {"available_block_calibrated", "available_sequence_calibrated"}
 
 
 def infer_genomic_blocks(features: pd.DataFrame, block_size_bp: int = 100_000) -> pd.Series:
@@ -150,6 +158,11 @@ def build_severe_null_panel(
     minimum_independent_blocks: int = 5,
     agreement_z_threshold: float = 2.0,
     score_columns: Iterable[str] | None = None,
+    sequences: dict[str, str] | None = None,
+    n_sequence_surrogates: int = 8,
+    seed: int = 13,
+    kmer_size: int = 3,
+    include_evolutionary: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if "region_id" not in scores.columns or "region_id" not in features.columns:
         raise ValueError("scores and features must contain region_id")
@@ -157,7 +170,15 @@ def build_severe_null_panel(
     frame = frame.reset_index(drop=True)
     frame["calibration_block_id"] = infer_genomic_blocks(frame, block_size_bp)
     primitives = list(score_columns) if score_columns is not None else _score_columns(scores)
-    availability = assess_null_availability(frame.columns)
+    resolved_sequences = dict(sequences or {})
+    if not resolved_sequences:
+        resolved_sequences = sequences_from_feature_table(frame)
+    sequence_available = bool(resolved_sequences)
+    availability = assess_null_availability(
+        frame.columns,
+        sequence_available=sequence_available,
+        evolutionary_model_available=sequence_available,
+    )
     registry_by_id = {str(item["null_model_id"]): item for item in availability}
     detailed_rows: list[dict[str, object]] = []
     for model_id in MATCH_COLUMNS:
@@ -198,32 +219,56 @@ def build_severe_null_panel(
                         "null_mean": mean,
                         "null_std": std,
                         "null_zscore": zscore,
-                        "empirical_p_value": float(p_value),
+                        "empirical_p_value": float(p_value) if np.isfinite(p_value) else math.nan,
                         "null_sample_size": int(values.size),
                         "independent_block_count": int(independent_blocks),
                         "calibration_block_id": str(row["calibration_block_id"]),
                         "matched_features_used": ",".join(columns),
                         "null_status": status,
                         "null_reason": reason,
+                        "null_execution_mode": "matched_table",
                     }
                 )
     details = pd.DataFrame(detailed_rows)
+    if sequence_available:
+        sequence_details = build_sequence_transform_null_details(
+            scores,
+            frame,
+            resolved_sequences,
+            primitives,
+            n_surrogates=n_sequence_surrogates,
+            seed=seed,
+            kmer_size=kmer_size,
+            include_evolutionary=include_evolutionary,
+        )
+        details = pd.concat([details, sequence_details], ignore_index=True, sort=False) if not sequence_details.empty else details
     summaries: list[dict[str, object]] = []
     all_ids = [str(item["null_model_id"]) for item in availability]
+    if details.empty:
+        return pd.DataFrame(summaries), details
     for (region_id, primitive), group in details.groupby(["region_id", "primitive"], sort=False):
         usable = group.loc[group["null_sample_size"] >= 2].copy()
         calibrated = usable.loc[usable["null_zscore"].map(np.isfinite)]
+        fully = group.loc[group["null_status"].astype(str).isin(FULLY_CALIBRATED_STATUSES)].copy()
         available_ids = usable["null_model_id"].astype(str).tolist()
+        fully_ids = fully["null_model_id"].astype(str).tolist()
+        sequence_ids = [model_id for model_id in fully_ids if model_id in SEQUENCE_NULL_MODEL_IDS]
         missing_ids = [model_id for model_id in all_ids if model_id not in available_ids]
         zvalues = calibrated["null_zscore"].to_numpy(dtype=float)
         pvalues = calibrated["empirical_p_value"].to_numpy(dtype=float)
         survival = zvalues >= agreement_z_threshold
         agreement = float(np.mean(survival)) if survival.size else math.nan
         conflict = bool(survival.any() and (~survival).any()) if survival.size else False
-        independent_blocks = int(usable["independent_block_count"].max()) if not usable.empty else 0
-        if len(available_ids) >= 3 and independent_blocks >= minimum_independent_blocks:
+        table_blocks = group.loc[group["null_execution_mode"].astype(str).eq("matched_table"), "independent_block_count"]
+        independent_blocks = int(table_blocks.max()) if not table_blocks.empty else int(usable["independent_block_count"].max()) if not usable.empty else 0
+        has_sequence_null = bool(sequence_ids)
+        table_fully = [model_id for model_id in fully_ids if model_id not in SEQUENCE_NULL_MODEL_IDS]
+        table_blocks_ok = (not table_fully) or independent_blocks >= minimum_independent_blocks
+        observed_score = pd.to_numeric(group["primitive_score"], errors="coerce")
+        observed_score = float(observed_score.dropna().iloc[0]) if observed_score.notna().any() else math.nan
+        if has_sequence_null and len(fully_ids) >= 3 and table_blocks_ok:
             panel_status = "severe_null_panel_available"
-        elif available_ids:
+        elif available_ids or fully_ids:
             panel_status = "partial_null_panel_not_for_promotion"
         else:
             panel_status = "null_panel_unavailable"
@@ -232,17 +277,22 @@ def build_severe_null_panel(
                 "region_id": region_id,
                 "primitive": primitive,
                 "null_model_id": "severe_null_panel_conservative_aggregate",
-                "primitive_score": float(group["primitive_score"].iloc[0]),
+                "primitive_score": float(observed_score) if np.isfinite(observed_score) else math.nan,
                 "null_zscore": float(np.min(zvalues)) if zvalues.size else math.nan,
                 "empirical_p_value": float(np.max(pvalues[np.isfinite(pvalues)])) if np.isfinite(pvalues).any() else math.nan,
                 "empirical_p_value_status": "available_explicit_named_null_panel" if zvalues.size else "unavailable",
-                "empirical_p_value_reason": "Conservative maximum empirical p-value across named calibrated nulls." if zvalues.size else "No calibrated named null distribution was available.",
+                "empirical_p_value_reason": (
+                    "Conservative maximum empirical p-value across named calibrated nulls, including sequence-transform families when sequence is available."
+                    if zvalues.size
+                    else "No calibrated named null distribution was available."
+                ),
                 "empirical_p_value_tail": "right_tail_high_score",
                 "null_panel_status": panel_status,
                 "available_null_models": ",".join(available_ids),
                 "missing_null_models": ",".join(missing_ids),
                 "missing_or_partial_null_models": ",".join(missing_ids),
                 "null_model_count": int(len(available_ids)),
+                "sequence_null_model_count": int(len(sequence_ids)),
                 "null_model_agreement": agreement,
                 "null_model_conflict": conflict,
                 "independent_block_count": independent_blocks,

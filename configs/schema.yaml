@@ -55,6 +55,8 @@ properties:
       block_size_bp: { type: integer, minimum: 1, default: 100000 }
       minimum_independent_blocks: { type: integer, minimum: 2, default: 5 }
       agreement_z_threshold: { type: number, default: 2.0 }
+      n_sequence_surrogates: { type: integer, minimum: 2, default: 8 }
+      sequence_kmer_size: { type: integer, minimum: 2, default: 3 }
   default_state_benchmark:
     type: object
     properties:

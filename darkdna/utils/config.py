@@ -78,6 +78,8 @@ try:  # pragma: no cover - depends on environment.
         minimum_independent_blocks: int = 5
         n_controls: int | None = None
         agreement_z_threshold: float = 2.0
+        n_sequence_surrogates: int = 8
+        sequence_kmer_size: int = 3
 
     class DefaultStateBenchmarkConfig(BaseModel):
         enabled: bool = False
@@ -202,6 +204,8 @@ except Exception:  # pragma: no cover - covered where pydantic unavailable.
         minimum_independent_blocks: int = 5
         n_controls: int | None = None
         agreement_z_threshold: float = 2.0
+        n_sequence_surrogates: int = 8
+        sequence_kmer_size: int = 3
 
     @dataclass
     class DefaultStateBenchmarkConfig:  # type: ignore[no-redef]

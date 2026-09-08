@@ -43,3 +43,5 @@ def test_severe_null_registry_is_complete_and_candidate_summary_is_conservative(
     assert not details.empty
     assert {"available_null_models", "missing_null_models", "null_model_count", "null_model_agreement", "null_model_conflict"}.issubset(summary.columns)
     assert summary["null_model_id"].eq("severe_null_panel_conservative_aggregate").all()
+    assert summary["null_panel_status"].eq("partial_null_panel_not_for_promotion").all()
+    assert (summary["sequence_null_model_count"] == 0).all()

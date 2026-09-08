@@ -36,6 +36,8 @@ def test_matched_null_model_schema():
     }.issubset(nulls.columns)
     assert not nulls.empty
     assert "dinucleotide_preserving_shuffle" in nulls.iloc[0]["missing_or_partial_null_models"]
+    assert nulls["null_panel_status"].eq("partial_null_panel_not_for_promotion").all()
+    assert (nulls["sequence_null_model_count"] == 0).all()
 
 
 def test_null_panel_status_is_not_single_zscore_sufficient():

@@ -47,6 +47,8 @@ null_models:
   block_size_bp: 100000
   minimum_independent_blocks: 5
   agreement_z_threshold: 2.0
+  n_sequence_surrogates: 8
+  sequence_kmer_size: 3
 default_state_benchmark:
   enabled: false
   max_windows: 256
