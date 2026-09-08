@@ -48,7 +48,6 @@ def make_tracks(
     coords = windows[["region_id", "chrom", "start", "end", "artifact_risk_flags"]].copy()
     global_residual = residuals[residuals["primitive"] == "unexplained_dark_anomaly_candidate_score"][["region_id", "residual_zscore"]]
     scored = coords.merge(global_residual, on="region_id", how="left")
-    scored["residual_zscore"] = scored["residual_zscore"].fillna(0.0)
     paths: dict[str, Path] = {}
     bedgraph_path = out / "all_residual_scores.bedGraph"
     write_bedgraph(scored.rename(columns={"residual_zscore": "score"}), bedgraph_path, "score")

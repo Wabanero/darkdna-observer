@@ -117,6 +117,9 @@ def assert_pipeline_outputs(outdir: Path) -> None:
     assert all(card.get("causal_validation_hierarchy") for card in cards)
     assert all(card.get("native_context_caveat") for card in cards)
     assert all(card.get("feature_hypothesis_boundary") for card in cards)
+    if "labeling_status" in labels.columns:
+        assert labels["labeling_status"].notna().all()
+        assert "competing_primitive_classes" in labels.columns
     assert all(card.get("terminology_scope") for card in cards)
     assert all(card.get("assembly_pangenome_context") for card in cards)
     assert all(card.get("score_methodology") for card in cards)

@@ -19,13 +19,18 @@ def _robust_location_scale(frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]
 
 
 def _mahalanobis_from_training(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
-    location, scale = _robust_location_scale(train)
-    train_z = (train.to_numpy(dtype=float) - location) / scale
-    test_z = (test.to_numpy(dtype=float) - location) / scale
-    train_z = np.nan_to_num(train_z, nan=0.0, posinf=0.0, neginf=0.0)
-    test_z = np.nan_to_num(test_z, nan=0.0, posinf=0.0, neginf=0.0)
+    train_complete = train.replace([np.inf, -np.inf], np.nan).dropna(axis=0, how="any")
+    if train_complete.empty or train_complete.shape[1] < 1:
+        return np.full(len(test), np.nan, dtype=float)
+    location, scale = _robust_location_scale(train_complete)
+    train_z = (train_complete.to_numpy(dtype=float) - location) / scale
+    test_raw = test.replace([np.inf, -np.inf], np.nan).to_numpy(dtype=float)
+    test_z = (test_raw - location) / scale
     if train_z.shape[1] == 1:
-        return np.abs(test_z[:, 0])
+        distances = []
+        for row in test_z:
+            distances.append(float(abs(row[0])) if np.isfinite(row[0]) else math.nan)
+        return np.asarray(distances, dtype=float)
     feature_count = train_z.shape[1]
     means = [float(np.mean(train_z[:, index])) for index in range(feature_count)]
     denominator = max(1, len(train_z) - 1)
@@ -40,6 +45,9 @@ def _mahalanobis_from_training(train: pd.DataFrame, test: pd.DataFrame) -> np.nd
     inverse = _gauss_jordan_inverse(covariance)
     distances: list[float] = []
     for row in test_z:
+        if not np.isfinite(row).all():
+            distances.append(math.nan)
+            continue
         vector = [float(value) for value in row]
         transformed = [sum(inverse[left][right] * vector[right] for right in range(feature_count)) for left in range(feature_count)]
         squared = sum(vector[index] * transformed[index] for index in range(feature_count))
@@ -126,10 +134,13 @@ def cross_fitted_unexplained_outlierness(
         train = matrix.loc[train_mask]
         test = matrix.loc[test_mask]
         distances = _mahalanobis_from_training(train, test)
-        # Calibrate distance only against the corresponding training data.
+        # Calibrate distance only against complete training rows.
         train_distances = _mahalanobis_from_training(train, train)
-        median = float(np.median(train_distances))
-        mad = float(np.median(np.abs(train_distances - median)) / 0.6745)
+        finite_train = train_distances[np.isfinite(train_distances)]
+        if finite_train.size < 2:
+            continue
+        median = float(np.median(finite_train))
+        mad = float(np.median(np.abs(finite_train - median)) / 0.6745)
         if not np.isfinite(mad) or mad <= 1e-9:
             continue
         output.loc[test_mask] = (distances - median) / mad

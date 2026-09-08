@@ -461,13 +461,25 @@ def _write_classical_control_multipanel(
         top = residuals.copy()
         top["residual_zscore"] = pd.to_numeric(top["residual_zscore"], errors="coerce")
         if "matched_null_zscore" in top.columns:
-            top["matched_null_zscore"] = pd.to_numeric(top["matched_null_zscore"], errors="coerce").fillna(0.0)
+            top["matched_null_zscore"] = pd.to_numeric(top["matched_null_zscore"], errors="coerce")
         else:
-            top["matched_null_zscore"] = 0.0
-        top["support_score"] = top["residual_zscore"].clip(lower=0.0) + 0.5 * top["matched_null_zscore"].clip(lower=0.0)
+            top["matched_null_zscore"] = np.nan
+        residual_part = top["residual_zscore"].clip(lower=0.0)
+        null_part = top["matched_null_zscore"].clip(lower=0.0)
+        top["support_score"] = residual_part.fillna(0.0) + 0.5 * null_part.fillna(0.0)
         top = top.dropna(subset=["residual_zscore"]).sort_values("support_score", ascending=False).head(8)
         if not labels.empty and {"region_id", "primitive_class"}.issubset(labels.columns):
-            top = top.merge(labels[["region_id", "primitive_class"]].drop_duplicates("region_id"), on="region_id", how="left")
+            label_cols = ["region_id", "primitive_class"]
+            if "primitive_score_name" in labels.columns:
+                label_cols.append("primitive_score_name")
+                top = top.merge(
+                    labels[label_cols].drop_duplicates(label_cols),
+                    left_on=["region_id", "primitive"],
+                    right_on=["region_id", "primitive_score_name"],
+                    how="left",
+                )
+            else:
+                top = top.merge(labels[label_cols], on="region_id", how="left")
         max_score = max(1e-9, float(top["support_score"].max())) if not top.empty else 1.0
         bar_left = x0 + 218
         bar_top = y0 + 46

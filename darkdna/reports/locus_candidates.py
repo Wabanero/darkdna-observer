@@ -72,10 +72,10 @@ def benjamini_hochberg_qvalues(p_values: pd.Series) -> pd.Series:
     return q
 
 
-def _numeric(df: pd.DataFrame, column: str, default: float = 0.0) -> pd.Series:
+def _numeric(df: pd.DataFrame, column: str, default: float = math.nan) -> pd.Series:
     if column not in df.columns:
         return pd.Series(default, index=df.index, dtype=float)
-    return pd.to_numeric(df[column], errors="coerce").fillna(default)
+    return pd.to_numeric(df[column], errors="coerce")
 
 
 def _candidate_windows(windows: pd.DataFrame, labels: pd.DataFrame, residuals: pd.DataFrame) -> pd.DataFrame:
@@ -121,7 +121,9 @@ def _candidate_windows(windows: pd.DataFrame, labels: pd.DataFrame, residuals: p
     if "window_size" not in candidates.columns:
         candidates["window_size"] = candidates["end"] - candidates["start"]
     candidates["window_size"] = pd.to_numeric(candidates["window_size"], errors="coerce").fillna(candidates["end"] - candidates["start"]).astype(int)
-    candidates["support_score"] = _numeric(candidates, "residual_zscore").clip(lower=0.0) + 0.5 * _numeric(candidates, "matched_null_zscore").clip(lower=0.0)
+    residual_z = _numeric(candidates, "residual_zscore")
+    matched_z = _numeric(candidates, "matched_null_zscore")
+    candidates["support_score"] = residual_z.clip(lower=0.0).fillna(0.0) + 0.5 * matched_z.clip(lower=0.0).fillna(0.0)
     candidates["primitive_confidence"] = _numeric(candidates, "primitive_confidence")
     candidates["empirical_p_value"] = pd.to_numeric(candidates.get("empirical_p_value", np.nan), errors="coerce")
     return candidates.sort_values(["primitive_class", "chrom", "start", "end"], kind="mergesort")
@@ -205,7 +207,7 @@ def _build_locus_row(group: pd.DataFrame, block_size: int) -> dict:
         "scale_discovery_window_size": discovery_size,
         "scale_validation_window_sizes": validation_sizes,
         "scale_validation_status": scale_status,
-        "support_score": float(support.max()),
+        "support_score": float(support.max()) if support.notna().any() else math.nan,
         "max_primitive_confidence": float(_numeric(group, "primitive_confidence").max()),
         "max_residual_zscore": float(_numeric(group, "residual_zscore").max()),
         "max_matched_null_zscore": float(_numeric(group, "matched_null_zscore").max()),

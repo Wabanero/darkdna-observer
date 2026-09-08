@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-import numpy as np
+from darkdna.utils.stats import finite_mean, optional_row_float
 
 
 def compute_boundary_condition_view(row: dict) -> dict[str, float]:
-    sequence_boundary = float(row.get("left_right_regime_difference_score", 0.0) or 0.0)
-    entropy_transition = float(row.get("entropy_boundary_score", 0.0) or 0.0)
-    repeat_unique = float(row.get("repeat_boundary_score", 0.0) or 0.0)
-    te_boundary = float(row.get("TE_boundary_score", 0.0) or 0.0)
-    negative_boundary = float(row.get("negative_space_boundary_score", 0.0) or 0.0)
-    candidate = float(np.mean([sequence_boundary, entropy_transition, repeat_unique, te_boundary, negative_boundary]))
+    sequence_boundary = optional_row_float(row, "left_right_regime_difference_score")
+    entropy_transition = optional_row_float(row, "entropy_boundary_score")
+    repeat_unique = optional_row_float(row, "repeat_boundary_score")
+    te_boundary = optional_row_float(row, "TE_boundary_score")
+    negative_boundary = optional_row_float(row, "negative_space_boundary_score")
+    candidate = finite_mean(
+        [sequence_boundary, entropy_transition, repeat_unique, te_boundary, negative_boundary]
+    )
     return {
         "sequence_regime_boundary_score": sequence_boundary,
         "entropy_transition_score": entropy_transition,

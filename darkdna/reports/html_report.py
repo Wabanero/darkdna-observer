@@ -173,8 +173,8 @@ def _active_evidence_rows(df: pd.DataFrame) -> pd.DataFrame:
         return df
     active = pd.Series(False, index=df.index)
     for col in score_cols:
-        values = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-        active = active | (values.abs() > 1e-12)
+        values = pd.to_numeric(df[col], errors="coerce")
+        active = active | (values.notna() & (values.abs() > 1e-12))
     return df.loc[active].copy()
 
 
@@ -219,7 +219,7 @@ def generate_html_report(
     )
     loci = merge_candidate_loci(windows, labels, residuals)
     block_bootstrap = block_bootstrap_locus_summary(loci)
-    top_candidates = labels.sort_values("primitive_confidence", ascending=False).head(20)
+    top_candidates = labels.sort_values("primitive_confidence", ascending=False, na_position="last").head(20)
     top_residuals = _active_evidence_rows(residuals).sort_values("residual_zscore", ascending=False).head(20)
     negative = _active_evidence_rows(residuals[residuals["primitive"] == "negative_space_element_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)
     boundary = _active_evidence_rows(residuals[residuals["primitive"] == "sequence_regime_boundary_candidate_score"]).sort_values("residual_zscore", ascending=False).head(20)

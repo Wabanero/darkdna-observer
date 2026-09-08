@@ -2,37 +2,56 @@
 
 Unlike non-B structures are not averaged into a mechanistic score.  The legacy
 aggregate is retained only as an explicitly deprecated priority-screen alias.
+Missing predictors stay NA and are omitted from means and maxima.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
+from darkdna.utils.stats import finite_max, finite_mean, optional_row_float
+
 
 def compute_physical_susceptibility_view(row: dict) -> dict[str, float]:
-    g4 = float(row.get("G4_sequence_potential", row.get("G4_susceptibility_proxy", row.get("predicted_G_quadruplex_proxy_score", 0.0))) or 0.0)
-    i_motif = float(row.get("i_motif_sequence_potential", 0.0) or 0.0)
-    z_dna = float(row.get("Z_DNA_sequence_potential", row.get("Z_DNA_propensity_proxy", 0.0)) or 0.0)
-    triplex = float(row.get("triplex_H_DNA_sequence_potential", row.get("triplex_H_DNA_proxy", 0.0)) or 0.0)
-    cruciform = float(row.get("cruciform_sequence_potential", row.get("cruciform_forming_potential", 0.0)) or 0.0)
-    slipped = float(row.get("slipped_DNA_sequence_potential", 0.0) or 0.0)
-    oxidation = float(row.get("G_tract_density", 0.0) or 0.0) + max(0.0, float(row.get("G_skew", 0.0) or 0.0))
-    rloop = float(row.get("R_loop_susceptibility_sequence_potential", row.get("R_loop_forming_potential", 0.0)) or 0.0)
-    fork_texture = float(
-        np.mean(
-            [
-                row.get("simple_repeat_fraction", 0.0) or 0.0,
-                row.get("palindrome_density", 0.0) or 0.0,
-                row.get("homopolymer_run_p95", 0.0) / max(1.0, row.get("length", 1.0) or 1.0),
-                row.get("AT_skew", 0.0) or 0.0,
-                row.get("spacing_periodicity_autocorrelation", 0.0) or 0.0,
-            ]
-        )
+    g4 = optional_row_float(
+        row,
+        "G4_sequence_potential",
+        "G4_susceptibility_proxy",
+        "predicted_G_quadruplex_proxy_score",
     )
-    charge = float(np.mean([g4, oxidation]))
+    i_motif = optional_row_float(row, "i_motif_sequence_potential")
+    z_dna = optional_row_float(row, "Z_DNA_sequence_potential", "Z_DNA_propensity_proxy")
+    triplex = optional_row_float(row, "triplex_H_DNA_sequence_potential", "triplex_H_DNA_proxy")
+    cruciform = optional_row_float(row, "cruciform_sequence_potential", "cruciform_forming_potential")
+    slipped = optional_row_float(row, "slipped_DNA_sequence_potential")
+    g_tract = optional_row_float(row, "G_tract_density")
+    g_skew = optional_row_float(row, "G_skew")
+    positive_skew = g_skew if np.isfinite(g_skew) and g_skew > 0 else float("nan")
+    if np.isfinite(g_tract) and np.isfinite(positive_skew):
+        oxidation = g_tract + positive_skew
+    elif np.isfinite(g_tract):
+        oxidation = g_tract
+    else:
+        oxidation = positive_skew
+    rloop = optional_row_float(row, "R_loop_susceptibility_sequence_potential", "R_loop_forming_potential")
+    homopolymer = optional_row_float(row, "homopolymer_run_p95")
+    length = optional_row_float(row, "length")
+    homopolymer_frac = homopolymer / length if np.isfinite(homopolymer) and np.isfinite(length) and length > 0 else float("nan")
+    fork_texture = finite_mean(
+        [
+            optional_row_float(row, "simple_repeat_fraction"),
+            optional_row_float(row, "palindrome_density"),
+            homopolymer_frac,
+            optional_row_float(row, "AT_skew"),
+            optional_row_float(row, "spacing_periodicity_autocorrelation"),
+        ]
+    )
+    charge = finite_mean([g4, oxidation])
     # A maximum is retained solely for compatibility ranking.  It means "at
     # least one Level-1 screen is high", not one shared formation mechanism.
-    legacy_priority = float(max(g4, i_motif, z_dna, triplex, cruciform, slipped, rloop, fork_texture))
+    legacy_priority = finite_max(
+        [g4, i_motif, z_dna, triplex, cruciform, slipped, rloop, fork_texture]
+    )
     return {
         "physical_view_G4_susceptibility": g4,
         "physical_view_i_motif_sequence_potential": i_motif,

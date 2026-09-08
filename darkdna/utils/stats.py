@@ -72,6 +72,48 @@ def minmax01(value: float, lo: float, hi: float) -> float:
     return float(np.clip((value - lo) / (hi - lo), 0.0, 1.0))
 
 
+def optional_float(value: object, default: float = math.nan) -> float:
+    """Coerce a scalar to a finite float, otherwise NA.
+
+    Missing, non-numeric, and non-finite values stay unavailable. Measured
+    zeros are preserved. Callers must not treat the default as evidence.
+    """
+
+    if value is None:
+        return float(default)
+    if isinstance(value, (bytes, str)) and str(value).strip() == "":
+        return float(default)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    return number if np.isfinite(number) else float(default)
+
+
+def optional_row_float(row: dict, *keys: str) -> float:
+    """Return the first finite numeric value among *keys*, else NA."""
+
+    getter = getattr(row, "get", None)
+    for key in keys:
+        if isinstance(row, dict) and key not in row:
+            continue
+        raw = getter(key) if getter is not None else None
+        number = optional_float(raw)
+        if np.isfinite(number):
+            return number
+    return math.nan
+
+
+def finite_mean(values: Iterable[float]) -> float:
+    finite = [float(value) for value in values if np.isfinite(value)]
+    return float(np.mean(finite)) if finite else math.nan
+
+
+def finite_max(values: Iterable[float]) -> float:
+    finite = [float(value) for value in values if np.isfinite(value)]
+    return float(np.max(finite)) if finite else math.nan
+
+
 def robust_scale_series(values: Iterable[float]) -> np.ndarray:
     arr = np.array(list(values), dtype=float)
     if arr.size == 0:
@@ -90,7 +132,6 @@ def robust_scale_series(values: Iterable[float]) -> np.ndarray:
 
 
 def row_score(row: dict, columns: list[str]) -> float:
-    vals = [float(row.get(col, 0.0) or 0.0) for col in columns]
-    if not vals:
-        return 0.0
-    return float(np.nanmean(vals))
+    """Mean of available columns. Missing columns stay out of the mean; all-missing is NA."""
+
+    return finite_mean(optional_row_float(row, column) for column in columns)

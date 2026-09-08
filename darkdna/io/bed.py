@@ -55,8 +55,8 @@ def write_bedgraph(df: pd.DataFrame, path: str | Path, value_col: str) -> None:
     with Path(path).open("w", encoding="utf-8") as handle:
         for row in df.itertuples():
             value = getattr(row, value_col, np.nan)
-            if pd.isna(value):
-                value = 0
+            if pd.isna(value) or not np.isfinite(float(value)):
+                continue
             handle.write(f"{row.chrom}\t{int(row.start)}\t{int(row.end)}\t{float(value):.6g}\n")
 
 
@@ -97,12 +97,15 @@ def weighted_interval_mean(chrom: str, start: int, end: int, intervals: pd.DataF
         return np.nan
     starts = pd.to_numeric(subset["start"], errors="coerce")
     ends = pd.to_numeric(subset["end"], errors="coerce")
-    values = pd.to_numeric(subset[value_col], errors="coerce").fillna(0.0)
+    values = pd.to_numeric(subset[value_col], errors="coerce")
     overlaps = (np.minimum(ends, int(end)) - np.maximum(starts, int(start))).clip(lower=0)
-    weight = float(overlaps.sum())
+    usable = values.notna() & overlaps.notna() & (overlaps > 0)
+    if not bool(usable.any()):
+        return np.nan
+    weight = float(overlaps.loc[usable].sum())
     if weight == 0:
         return np.nan
-    total = float((overlaps * values).sum())
+    total = float((overlaps.loc[usable] * values.loc[usable]).sum())
     return float(total / length)
 
 

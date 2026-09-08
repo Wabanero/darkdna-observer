@@ -190,7 +190,8 @@ def build_region_card(
     conflicting = []
     if str(window.get("artifact_risk_flags", "")):
         conflicting.append("artifact_risk_flags_present")
-    if float(label.get("primitive_confidence", 0.0) or 0.0) < 0.4:
+    confidence = _finite_float(label.get("primitive_confidence", label.get("primitive_priority")))
+    if confidence is not None and confidence < 0.4:
         conflicting.append("low_confidence")
     controlled = ""
     subset = residuals[residuals["region_id"].astype(str) == region_id]
@@ -275,6 +276,18 @@ def build_region_card(
             "child_region_ids": window.get("child_region_ids"),
         },
         "primitive_class": primitive,
+        "labeling_status": str(label.get("labeling_status", "")),
+        "competing_primitive_classes": [
+            item for item in str(label.get("competing_primitive_classes", "") or "").split(";") if item
+        ],
+        "competing_primitive_count": int(label.get("competing_primitive_count", 0) or 0)
+        if pd.notna(label.get("competing_primitive_count", np.nan))
+        else 0,
+        "is_exclusive_label": (
+            bool(label.get("is_exclusive_label"))
+            if pd.notna(label.get("is_exclusive_label", np.nan))
+            else None
+        ),
         "analysis_modes": analysis_modes,
         "sequence_specific_candidate": primitive,
         "sequence_indifferent_architecture": mode_b_summary,
@@ -318,7 +331,7 @@ def build_region_card(
             "primitive labels are assay-generating hypotheses, not observed molecular properties."
         ),
         "suggested_prompt2_view": ontology.suggested_prompt2_view,
-        "primitive_confidence": float(label.get("primitive_confidence", 0.0) or 0.0),
+        "primitive_confidence": confidence,
         "top_scores": top_scores,
         "top_supporting_features": supporting_features,
         "conflicting_features": conflicting,
@@ -370,7 +383,9 @@ def make_region_cards(
     progress: bool = False,
 ) -> list[dict]:
     merged = labels.merge(windows, on="region_id", how="left", suffixes=("_label", ""))
-    merged = merged.sort_values("primitive_confidence", ascending=False)
+    sort_column = "primitive_priority" if "primitive_priority" in merged.columns else "primitive_confidence"
+    if sort_column in merged.columns:
+        merged = merged.sort_values(sort_column, ascending=False, na_position="last")
     if top_n:
         merged = merged.head(top_n)
     cards = []
@@ -406,6 +421,9 @@ def write_region_cards(cards: list[dict], outdir: str | Path) -> dict[str, Path]
                 "region_id": c["region_id"],
                 "coordinates": c["coordinates"],
                 "primitive_class": c["primitive_class"],
+                "labeling_status": c.get("labeling_status", ""),
+                "competing_primitive_classes": ";".join(c.get("competing_primitive_classes") or []),
+                "is_exclusive_label": c.get("is_exclusive_label"),
                 "analysis_modes": ";".join(c.get("analysis_modes", [])),
                 "sequence_indifferent_candidate": c.get("sequence_indifferent_candidate", "unavailable"),
                 "dominant_mode": c.get("dominant_mode", "Mode_A"),
